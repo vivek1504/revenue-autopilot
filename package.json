@@ -8,7 +8,7 @@
     "seed": "tsx scripts/seed-data.ts",
     "test-razorpay": "tsx scripts/test-razorpay.ts",
     "verify-audit": "tsx scripts/verify-audit.ts",
-    "test": "vitest run"
+    "test": "vitest run tests/"
   },
   "keywords": [],
   "author": "",

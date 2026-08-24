@@ -2,7 +2,6 @@
   "compilerOptions": {
     "target": "es2022",
     "module": "commonjs",
-    "moduleResolution": "node",
     "outDir": "dist",
     "rootDir": ".",
     "strict": true,
@@ -12,5 +11,6 @@
     "declaration": true,
     "sourceMap": true
   },
-  "include": ["src/**/*", "scripts/**/*", "tests/**/*"]
+  "include": ["src/**/*", "scripts/**/*", "tests/**/*"],
+  "exclude": ["dist", "node_modules"]
 }
