@@ -3,3 +3,4 @@ node_modules
 db
 dist
 *.db*
+scripts/test-razorpay.ts
