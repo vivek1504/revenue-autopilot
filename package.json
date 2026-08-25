@@ -5,7 +5,12 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "start:api": "tsx src/api/server.ts",
+    "dashboard": "npm --prefix dashboard run dev",
+    "benchmark": "tsx scripts/run-benchmark.ts",
     "seed": "tsx scripts/seed-data.ts",
+    "clean": "rm -f data/audit.jsonl data/*.db*",
+    "reset": "rm -f data/audit.jsonl data/*.db* && tsx scripts/seed-data.ts",
     "test-razorpay": "tsx scripts/test-razorpay.ts",
     "verify-audit": "tsx scripts/verify-audit.ts",
     "test": "vitest run tests/"
