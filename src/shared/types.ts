@@ -123,3 +123,42 @@ export interface RecoveryOffer {
   razorpay_payment_link_id?: string;
   razorpay_order_id?: string;
 }
+
+export interface ProcessedAction {
+  proposal: AgentProposal;
+  verdict: PolicyResult;
+  execution?: ExecutionResult;
+  auditRecord: AuditRecord;
+  customerName?: string;
+}
+
+export type AutopilotEvent =
+  | { type: 'start'; total_opportunities: number }
+  | { type: 'detection_complete'; count: number }
+  | { type: 'proposal'; proposal: AgentProposal }
+  | { type: 'verdict'; verdict: PolicyResult }
+  | { type: 'execution'; execution: ExecutionResult }
+  | { type: 'processed'; item: ProcessedAction }
+  | { type: 'complete'; summary: AutopilotResult };
+
+export interface AutopilotResult {
+  total_opportunities: number;
+  approved_count: number;
+  blocked_count: number;
+  unsafe_value_blocked_paise: number;
+  approved_value_paise: number;
+  duration_ms: number;
+  results: ProcessedAction[];
+}
+
+export interface DashboardSummary {
+  total_customers: number;
+  opportunities_count: number;
+  approved_count: number;
+  blocked_count: number;
+  unsafe_value_blocked_paise: number;
+  approved_value_paise: number;
+  live_links_created: number;
+  redeemed_count: number;
+}
+
