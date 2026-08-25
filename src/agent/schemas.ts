@@ -19,6 +19,7 @@ export const AgentProposalSchema = z.object({
     'upsell',
     're_engagement',
   ]),
+  confidence_score: z.number().min(0).max(1).optional(),
   evidence: z.object({
     cart_value_paise: z.number().optional(),
     lifetime_spend_paise: z.number().optional(),
@@ -58,17 +59,22 @@ export const GEMINI_PROPOSAL_RESPONSE_SCHEMA: ResponseSchema = {
     },
     expiry_hours: {
       type: SchemaType.INTEGER,
-      description: 'Payment link expiry time in hours (1 to 168)',
+      description: 'Link expiration time in hours (1-168)',
     },
     reason: {
       type: SchemaType.STRING,
-      description: 'Justification for the action based ONLY on verified customer data',
+      description: 'Short explanation justifying this action',
     },
     opportunity_type: {
       type: SchemaType.STRING,
       format: 'enum',
-      enum: ['abandoned_checkout', 'failed_payment', 'upsell', 're_engagement'],
-      description: 'The detected opportunity category',
+      enum: [
+        'abandoned_checkout',
+        'failed_payment',
+        'upsell',
+        're_engagement',
+      ],
+      description: 'The identified trigger reason',
     },
     evidence: {
       type: SchemaType.OBJECT,
@@ -79,6 +85,7 @@ export const GEMINI_PROPOSAL_RESPONSE_SCHEMA: ResponseSchema = {
         failed_payment_count: { type: SchemaType.INTEGER },
         cart_abandoned_hours_ago: { type: SchemaType.INTEGER },
       },
+      description: 'Evidence supporting this proposal',
     },
   },
   required: [
