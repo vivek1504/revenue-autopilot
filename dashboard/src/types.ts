@@ -21,10 +21,15 @@ export interface AgentProposal {
   confidence_score?: number;
   evidence: {
     cart_value_paise?: number;
+    cart_value?: number;
+    abandonment_time?: string;
     lifetime_spend_paise?: number;
     last_purchase_days_ago?: number;
     failed_payment_count?: number;
     cart_abandoned_hours_ago?: number;
+    failure_reason?: string;
+    attempts?: number;
+    [key: string]: any;
   };
 }
 
@@ -63,66 +68,17 @@ export interface AuditRecord {
   record_hash: string;
 }
 
-export interface Customer {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  tier: 'standard' | 'premium' | 'vip';
-  lifetime_spend_paise: number;
-  total_orders: number;
-  first_purchase_date?: string;
-  last_purchase_date?: string;
-  notes?: string;
-  created_at: string;
-}
-
-export interface Product {
-  id: string;
-  name: string;
-  category: string;
-  price_paise: number;
-  description: string;
-}
-
-export interface CartItem {
-  product_id: string;
-  quantity: number;
-  price_paise: number;
-}
-
-export interface Cart {
-  id: string;
-  customer_id: string;
-  items: CartItem[];
-  total_paise: number;
-  created_at: string;
-  last_activity: string;
-  status: 'active' | 'abandoned' | 'converted';
-}
-
-export interface Order {
-  id: string;
-  customer_id: string;
-  status: 'completed' | 'failed' | 'abandoned' | 'pending';
-  total_paise: number;
-  created_at: string;
-  completed_at?: string;
-  failure_reason?: string;
-  items: CartItem[];
-}
-
-export interface RecoveryOffer {
-  id: string;
-  customer_id: string;
-  action_type: ActionType;
-  amount_paise: number;
-  discount_percent: number;
-  status: 'pending' | 'sent' | 'redeemed' | 'expired';
-  created_at: string;
-  expires_at: string;
-  razorpay_payment_link_id?: string;
-  razorpay_order_id?: string;
+export interface AuditVerificationResult {
+  valid: boolean;
+  total_records: number;
+  verified_records: number;
+  broken_sequence?: number;
+  error?: string;
+  tampered_at?: {
+    sequence: number;
+    expected_hash: string;
+    actual_hash: string;
+  };
 }
 
 export interface ProcessedAction {
@@ -173,7 +129,7 @@ export interface DashboardSummary {
 }
 
 export interface CohortPerformance {
-  cohort_key: OpportunityType;
+  cohort_key: string;
   label: string;
   count: number;
   volume_paise: number;
@@ -189,7 +145,7 @@ export interface TimeSeriesPoint {
   recovered_paise: number;
 }
 
-export interface RuleCatchDistribution {
+export interface RuleCatchItem {
   rule: string;
   count: number;
   percentage: number;
@@ -205,14 +161,13 @@ export interface TelemetryBenchmarks {
   p99_llm_ms: number;
   throughput_ops_sec: number;
   active_pipelines_count: number;
-  rule_catches: RuleCatchDistribution[];
+  rule_catches: RuleCatchItem[];
 }
 
 export interface SystemSettings {
   model: string;
-  autonomy_mode: 'autonomous' | 'supervised';
+  autonomy_mode: string;
   max_discount_percent: number;
   max_expiry_hours: number;
   high_value_threshold_paise: number;
-  updated_at?: string;
 }

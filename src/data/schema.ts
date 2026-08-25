@@ -78,6 +78,13 @@ export function initializeDatabase(customPath?: string): Database.Database {
       razorpay_order_id TEXT
     );
 
+    -- System Settings
+    CREATE TABLE IF NOT EXISTS system_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
     -- Indexes
     CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
     CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);

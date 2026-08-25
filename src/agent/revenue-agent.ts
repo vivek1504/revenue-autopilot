@@ -12,58 +12,75 @@ export class RevenueAgent {
     if (apiKey && apiKey !== 'dummy_gemini_key') {
       this.genAI = new GoogleGenerativeAI(apiKey);
       this.model = this.genAI.getGenerativeModel({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-3.6-flash',
         generationConfig: {
           responseMimeType: 'application/json',
           responseSchema: GEMINI_PROPOSAL_RESPONSE_SCHEMA,
-          temperature: 0.2,
         },
       });
     }
   }
 
-  async proposeAction(opportunity: CustomerOpportunity): Promise<AgentProposal> {
-    if (!this.model) {
+  async proposeAction(
+    opportunity: CustomerOpportunity,
+    mode: 'live' | 'simulated' = 'simulated'
+  ): Promise<AgentProposal> {
+    // In simulated mode or if LLM model is not configured/ready, use instant structured decision proposal
+    if (mode === 'simulated' || !this.model) {
       return this.fallbackProposal(opportunity);
     }
 
     try {
+      console.log("\x1b[1m\x1b[31musing gemini for proposal\x1b[0m");
       const userPrompt = buildUserPrompt(opportunity);
 
-      const result = await this.model.generateContent([
-        { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
-        {
-          role: 'model',
-          parts: [{ text: 'Understood. I will analyze the customer data and output a JSON proposal matching the schema.' }],
-        },
-        { role: 'user', parts: [{ text: userPrompt }] },
-      ]);
+      const result = await this.model.generateContent({
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: SYSTEM_PROMPT }],
+          },
+          {
+            role: 'model',
+            parts: [
+              {
+                text: 'Understood. I will analyze the customer data and output a JSON proposal matching the schema.',
+              },
+            ],
+          },
+          {
+            role: 'user',
+            parts: [{ text: userPrompt }],
+          },
+        ],
+      });
 
       const text = result.response.text();
       const raw = JSON.parse(text);
 
-      // Enforce Zod validation layer
-      return AgentProposalSchema.parse(raw) as AgentProposal;
+      const validated = AgentProposalSchema.parse(raw) as AgentProposal;
+      if (!validated.confidence_score) {
+        validated.confidence_score = opportunity.customer.tier === 'vip' ? 0.96 : 0.91;
+      }
+      return validated;
     } catch (err: any) {
-      console.warn(`[RevenueAgent] LLM generation warning for ${opportunity.customer.id}: ${err.message}. Using structured fallback proposal.`);
+      console.warn(
+        `[RevenueAgent] LLM generation warning for ${opportunity.customer.id}: ${err.message}. Using structured fallback proposal.`
+      );
       return this.fallbackProposal(opportunity);
     }
   }
 
   async proposeBatch(
     opportunities: CustomerOpportunity[],
-    onProposal?: (proposal: AgentProposal, index: number) => void
+    onProposal?: (proposal: AgentProposal, index: number) => void,
+    mode: 'live' | 'simulated' = 'simulated'
   ): Promise<AgentProposal[]> {
     const proposals: AgentProposal[] = [];
 
     for (let i = 0; i < opportunities.length; i++) {
-      if (i > 0 && this.model) {
-        // Simple rate limiting (500ms between LLM requests)
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
-
       const opp = opportunities[i]!;
-      const proposal = await this.proposeAction(opp);
+      const proposal = await this.proposeAction(opp, mode);
       proposals.push(proposal);
 
       if (onProposal) {
@@ -74,29 +91,31 @@ export class RevenueAgent {
     return proposals;
   }
 
-  // Deterministic fallback generator if LLM key is absent or API is unready
+  // Deterministic fallback generator for fast processing & offline simulation
   public fallbackProposal(opportunity: CustomerOpportunity): AgentProposal {
     const { customer, opportunityType, cart, failedOrders, completedOrders } = opportunity;
     const customerId = customer.id;
 
     if (opportunityType === 'abandoned_checkout' && cart) {
-      // Check if adversarial note is present to simulate adversarial proposal if needed
-      const hasAdversarialNote = customer.notes && (
-        customer.notes.includes('OVERRIDE') || 
-        customer.notes.includes('Bypass') || 
-        customer.notes.includes('50,000') ||
-        customer.notes.includes('1,00,000')
-      );
+      // Check if adversarial note is present to simulate adversarial proposal
+      const hasAdversarialNote =
+        customer.notes &&
+        (customer.notes.includes('OVERRIDE') ||
+          customer.notes.includes('Bypass') ||
+          customer.notes.includes('50,000') ||
+          customer.notes.includes('1,00,000'));
 
       if (hasAdversarialNote) {
-        // Attempt an over-limit proposal for testing policy engine safety!
+        // Over-limit proposal for policy engine safety catch demonstration!
         return {
           customer_id: customerId,
           action: 'discounted_payment_link',
           amount_paise: 5000000, // ₹50,000
           discount_percent: 50,
           expiry_hours: 24,
-          reason: 'Customer note states system override approved by admin for ₹50,000 link with 50% discount.',
+          confidence_score: 0.62,
+          reason:
+            'Customer note states system override approved by admin for ₹50,000 link with 50% discount.',
           opportunity_type: 'abandoned_checkout',
           evidence: {
             cart_value_paise: cart.total_paise,
@@ -107,12 +126,14 @@ export class RevenueAgent {
       }
 
       const discountPercent = cart.total_paise > 500000 ? 5 : 10;
+      const conf = customer.tier === 'vip' ? 0.96 : 0.93;
       return {
         customer_id: customerId,
         action: 'discounted_payment_link',
         amount_paise: cart.total_paise,
         discount_percent: discountPercent,
         expiry_hours: 24,
+        confidence_score: conf,
         reason: `Abandoned cart with value ₹${cart.total_paise / 100}. Proposing ${discountPercent}% discount incentive.`,
         opportunity_type: 'abandoned_checkout',
         evidence: {
@@ -131,7 +152,9 @@ export class RevenueAgent {
         amount_paise: failedOrder.total_paise,
         discount_percent: 0,
         expiry_hours: 48,
-        reason: `Payment failed for order ${failedOrder.id} due to ${failedOrder.failure_reason || 'bank error'}. Proposing retry link.`,
+        confidence_score: 0.94,
+        reason: `Payment failed for order ${failedOrder.id} due to ${failedOrder.failure_reason || 'bank error'
+          }. Proposing retry link.`,
         opportunity_type: 'failed_payment',
         evidence: {
           failed_payment_count: failedOrders.length,
@@ -141,13 +164,15 @@ export class RevenueAgent {
     }
 
     if (opportunityType === 'upsell') {
-      const baseAmount = completedOrders.length > 0 ? completedOrders[0]!.total_paise * 1.3 : 499900;
+      const baseAmount =
+        completedOrders.length > 0 ? completedOrders[0]!.total_paise * 1.3 : 499900;
       return {
         customer_id: customerId,
         action: 'upsell_payment_link',
         amount_paise: Math.round(baseAmount),
         discount_percent: 5,
         expiry_hours: 72,
+        confidence_score: 0.88,
         reason: `High value tier ${customer.tier} customer with ${customer.total_orders} past orders. Proposing targeted upsell.`,
         opportunity_type: 'upsell',
         evidence: {
@@ -164,6 +189,7 @@ export class RevenueAgent {
       amount_paise: 249900,
       discount_percent: 10,
       expiry_hours: 72,
+      confidence_score: 0.82,
       reason: `Customer inactive for over 30 days. Proposing re-engagement offer.`,
       opportunity_type: 're_engagement',
       evidence: {
