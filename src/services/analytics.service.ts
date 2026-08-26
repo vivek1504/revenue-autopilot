@@ -1,12 +1,27 @@
 import { ProcessedAction, TimeSeriesPoint, CohortPerformance } from '../shared/types';
+import { prisma as globalPrisma } from '../api/dependencies';
 
 export class AnalyticsService {
-  public getTimeseries(items: ProcessedAction[]): TimeSeriesPoint[] {
+  public async getTimeseries(items: ProcessedAction[]): Promise<TimeSeriesPoint[]> {
     if (items.length === 0) {
       return [];
     }
 
-    const pointsMap = new Map<string, { label: string; recoverable_paise: number; recovered_paise: number }>();
+    const pointsMap = new Map<
+      string,
+      { label: string; recoverable_paise: number; recovered_paise: number }
+    >();
+
+    // Fetch redeemed offers to get real recovered amounts
+    let redeemedOffers: { created_at: Date; amount_paise: number; discount_percent: number }[] = [];
+    try {
+      redeemedOffers = await globalPrisma.recoveryOffer.findMany({
+        where: { status: 'redeemed' },
+        select: { created_at: true, amount_paise: true, discount_percent: true },
+      });
+    } catch {
+      redeemedOffers = [];
+    }
 
     const sorted = [...items].sort((a, b) => {
       const tA = new Date(a.auditRecord?.timestamp || 0).getTime();
@@ -15,9 +30,14 @@ export class AnalyticsService {
     });
 
     for (const item of sorted) {
-      const ts = item.auditRecord?.timestamp ? new Date(item.auditRecord.timestamp) : new Date();
+      const ts = item.auditRecord?.timestamp
+        ? new Date(item.auditRecord.timestamp)
+        : new Date();
       const dateKey = ts.toISOString().split('T')[0]!;
-      const label = ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const label = ts.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      });
 
       const current = pointsMap.get(dateKey) || {
         label,
@@ -27,32 +47,37 @@ export class AnalyticsService {
 
       if (item.verdict.verdict === 'APPROVED') {
         const discounted = Math.round(
-          (item.proposal.amount_paise || 0) * (1 - (item.proposal.discount_percent || 0) / 100)
+          (item.proposal.amount_paise || 0) *
+            (1 - (item.proposal.discount_percent || 0) / 100)
         );
         current.recoverable_paise += discounted;
       }
       pointsMap.set(dateKey, current);
     }
 
-    const entries = Array.from(pointsMap.entries());
-    if (entries.length === 1) {
-      const [key, data] = entries[0]!;
-      return [
-        {
-          period: `${key}-init`,
-          label: 'Pre-Scan',
+    // Add real recovered amounts to the corresponding date buckets
+    for (const offer of redeemedOffers) {
+      const dateKey = offer.created_at.toISOString().split('T')[0]!;
+      const discounted = Math.round(
+        offer.amount_paise * (1 - (offer.discount_percent || 0) / 100)
+      );
+      const existing = pointsMap.get(dateKey);
+      if (existing) {
+        existing.recovered_paise += discounted;
+      } else {
+        const label = offer.created_at.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+        });
+        pointsMap.set(dateKey, {
+          label,
           recoverable_paise: 0,
-          recovered_paise: 0,
-        },
-        {
-          period: key,
-          label: data.label,
-          recoverable_paise: data.recoverable_paise,
-          recovered_paise: data.recovered_paise,
-        },
-      ];
+          recovered_paise: discounted,
+        });
+      }
     }
 
+    const entries = Array.from(pointsMap.entries());
     return entries.map(([period, data]) => ({
       period,
       label: data.label,
@@ -62,7 +87,10 @@ export class AnalyticsService {
   }
 
   public getCohorts(items: ProcessedAction[]): CohortPerformance[] {
-    const cohortGroups: Record<string, { count: number; volume_paise: number; approved_count: number }> = {
+    const cohortGroups: Record<
+      string,
+      { count: number; volume_paise: number; approved_count: number }
+    > = {
       abandoned_checkout: { count: 0, volume_paise: 0, approved_count: 0 },
       failed_payment: { count: 0, volume_paise: 0, approved_count: 0 },
       upsell: { count: 0, volume_paise: 0, approved_count: 0 },
@@ -81,10 +109,9 @@ export class AnalyticsService {
       }
     }
 
-    const totalVolume = Object.values(cohortGroups).reduce(
-      (sum, g) => sum + g.volume_paise,
-      0
-    ) || 1;
+    const totalVolume =
+      Object.values(cohortGroups).reduce((sum, g) => sum + g.volume_paise, 0) ||
+      1;
 
     return [
       {
@@ -103,7 +130,6 @@ export class AnalyticsService {
         percentage_of_total: Math.round(
           (cohortGroups.abandoned_checkout.volume_paise / totalVolume) * 100
         ),
-        color: 'bg-blue-600',
       },
       {
         cohort_key: 'failed_payment',
@@ -121,7 +147,6 @@ export class AnalyticsService {
         percentage_of_total: Math.round(
           (cohortGroups.failed_payment.volume_paise / totalVolume) * 100
         ),
-        color: 'bg-emerald-500',
       },
       {
         cohort_key: 'upsell',
@@ -139,7 +164,6 @@ export class AnalyticsService {
         percentage_of_total: Math.round(
           (cohortGroups.upsell.volume_paise / totalVolume) * 100
         ),
-        color: 'bg-indigo-600',
       },
       {
         cohort_key: 're_engagement',
@@ -157,7 +181,6 @@ export class AnalyticsService {
         percentage_of_total: Math.round(
           (cohortGroups.re_engagement.volume_paise / totalVolume) * 100
         ),
-        color: 'bg-amber-500',
       },
     ];
   }

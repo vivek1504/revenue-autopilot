@@ -9,7 +9,7 @@ export function createAnalyticsRouter(): Router {
   router.get('/timeseries', async (req: Request, res: Response) => {
     try {
       const items = await getAllCurrentActions();
-      const timeseries = analyticsService.getTimeseries(items);
+      const timeseries = await analyticsService.getTimeseries(items);
       res.json(timeseries);
     } catch (err: any) {
       res.status(500).json({ error: err.message });

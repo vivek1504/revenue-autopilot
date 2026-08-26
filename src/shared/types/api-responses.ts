@@ -29,7 +29,7 @@ export interface CohortPerformance {
   volume_paise: number;
   conversion_rate_pct: number;
   percentage_of_total: number;
-  color: string;
+  color?: string;
 }
 
 export interface TimeSeriesPoint {
@@ -43,7 +43,7 @@ export interface RuleCatchDistribution {
   rule: string;
   count: number;
   percentage: number;
-  color: string;
+  color?: string;
 }
 
 export interface TelemetryBenchmarks {

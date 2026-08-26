@@ -53,6 +53,7 @@ model Order {
 
   @@index([customer_id])
   @@index([status])
+  @@index([customer_id, status, created_at])
   @@map("orders")
 }
 
@@ -87,6 +88,8 @@ model RecoveryOffer {
   customer Customer @relation(fields: [customer_id], references: [id])
 
   @@index([customer_id])
+  @@index([razorpay_payment_link_id])
+  @@index([status])
   @@map("recovery_offers")
 }
 
