@@ -17,7 +17,14 @@ export { autopilotEmitter };
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+// Capture raw byte buffer for precise HMAC webhook verification
+app.use(
+  express.json({
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 
 // Mount route modules
 app.use('/api/dashboard', createDashboardRouter());

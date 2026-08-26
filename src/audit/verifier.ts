@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { AuditRecord } from '../shared/types';
-import { GENESIS_HASH } from './logger';
+import { GENESIS_HASH, canonicalJsonStringify } from './logger';
 
 export interface VerificationResult {
   valid: boolean;
@@ -17,7 +17,8 @@ export interface VerificationResult {
 }
 
 export function verifyAuditIntegrity(auditPath?: string): VerificationResult {
-  const targetPath = auditPath || path.join(process.cwd(), 'data', 'audit.jsonl');
+  const targetPath =
+    auditPath || path.join(process.cwd(), 'data', 'audit.jsonl');
 
   if (!fs.existsSync(targetPath)) {
     return {
@@ -61,9 +62,10 @@ export function verifyAuditIntegrity(auditPath?: string): VerificationResult {
       };
     }
 
-    // 2. Recompute record hash and compare
+    // 2. Recompute record hash using deterministic canonical JSON
     const { record_hash, ...recordWithoutHash } = record;
-    const payload = expectedPreviousHash + JSON.stringify(recordWithoutHash);
+    const payload =
+      expectedPreviousHash + canonicalJsonStringify(recordWithoutHash);
     const computedHash = crypto
       .createHash('sha256')
       .update(payload)
