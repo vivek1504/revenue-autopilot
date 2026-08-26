@@ -1,13 +1,16 @@
 import EventEmitter from 'events';
-import Database from 'better-sqlite3';
-import { initializeDatabase } from '../data/schema';
+import { PrismaClient } from '@prisma/client';
+import pg from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { RazorpayClient } from '../gateway/razorpay-client';
 import { AuditLogger } from '../audit/logger';
 import { config } from '../shared/config';
 
 export const autopilotEmitter = new EventEmitter();
 
-export const db: Database.Database = initializeDatabase(config.dbPath);
+const pool = new pg.Pool({ connectionString: config.databaseUrl });
+const adapter = new PrismaPg(pool);
+export const prisma = new PrismaClient({ adapter });
 
 export const rzpClient = new RazorpayClient(
   config.razorpay.keyId,

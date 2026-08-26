@@ -1,0 +1,99 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Customer {
+  id                   String          @id
+  name                 String
+  email                String
+  phone                String?
+  tier                 String          @default("standard")
+  lifetime_spend_paise Int             @default(0)
+  total_orders         Int             @default(0)
+  first_purchase_date  DateTime?
+  last_purchase_date   DateTime?
+  notes                String?
+  created_at           DateTime        @default(now())
+
+  orders               Order[]
+  carts                Cart[]
+  recovery_offers      RecoveryOffer[]
+
+  @@map("customers")
+}
+
+model Product {
+  id          String  @id
+  name        String
+  category    String
+  price_paise Int
+  description String?
+
+  @@map("products")
+}
+
+model Order {
+  id             String    @id
+  customer_id    String
+  status         String
+  total_paise    Int
+  created_at     DateTime
+  completed_at   DateTime?
+  failure_reason String?
+  items          Json
+
+  customer Customer @relation(fields: [customer_id], references: [id])
+
+  @@index([customer_id])
+  @@index([status])
+  @@map("orders")
+}
+
+model Cart {
+  id            String   @id
+  customer_id   String
+  items         Json
+  total_paise   Int
+  created_at    DateTime
+  last_activity DateTime
+  status        String   @default("active")
+
+  customer Customer @relation(fields: [customer_id], references: [id])
+
+  @@index([customer_id])
+  @@index([status])
+  @@map("carts")
+}
+
+model RecoveryOffer {
+  id                       String   @id
+  customer_id              String
+  action_type              String
+  amount_paise             Int
+  discount_percent         Float    @default(0)
+  status                   String   @default("pending")
+  created_at               DateTime
+  expires_at               DateTime
+  razorpay_payment_link_id String?
+  razorpay_order_id        String?
+
+  customer Customer @relation(fields: [customer_id], references: [id])
+
+  @@index([customer_id])
+  @@map("recovery_offers")
+}
+
+model SystemSetting {
+  key        String   @id
+  value      String
+  updated_at DateTime @default(now())
+
+  @@map("system_settings")
+}
