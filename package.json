@@ -11,9 +11,10 @@
     "seed": "tsx scripts/seed-data.ts",
     "seed:small": "tsx scripts/seed-small.ts",
     "clean": "rm -f data/audit.jsonl data/*.db*",
-    "reset": "rm -f data/audit.jsonl data/*.db* && tsx scripts/seed-data.ts",
     "test-razorpay": "tsx scripts/test-razorpay.ts",
-    "verify-audit": "tsx scripts/verify-audit.ts",
+    "demo": "tsx scripts/demo.ts",
+    "demo:verify": "tsx scripts/demo-verify.ts",
+    "test:e2e-sim": "tsx scripts/test-simulated-e2e.ts",
     "test": "vitest run tests/"
   },
   "keywords": [],
