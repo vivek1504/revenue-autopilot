@@ -4,5 +4,10 @@ db
 dist
 *.db*
 scripts/test-razorpay.ts
-
+audit.jsonl
+data/*.jsonl
 /generated/prisma
+.agents
+.claude
+.windsurf
+skills-lock.json
