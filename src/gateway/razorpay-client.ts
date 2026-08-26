@@ -26,8 +26,11 @@ export class RazorpayClient {
   private webhookSecret: string;
 
   constructor(keyId: string, keySecret: string, webhookSecret: string) {
-    this.rzp = new Razorpay({ key_id: keyId, key_secret: keySecret });
-    this.webhookSecret = webhookSecret;
+    this.rzp = new Razorpay({
+      key_id: keyId || 'rzp_test_placeholder',
+      key_secret: keySecret || 'rzp_secret_placeholder',
+    });
+    this.webhookSecret = webhookSecret || 'dummy_wh_secret';
   }
 
   async createOrder(params: CreateOrderParams): Promise<any> {
