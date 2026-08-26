@@ -1,9 +1,31 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { AgentProposal, AuditRecord, ExecutionResult, LLMReasoningMetadata, PolicyResult } from '../shared/types';
+import {
+  AgentProposal,
+  AuditRecord,
+  ExecutionResult,
+  LLMReasoningMetadata,
+  PolicyResult,
+} from '../shared/types';
 
 export const GENESIS_HASH = '0'.repeat(64);
+
+export function canonicalJsonStringify(obj: any): string {
+  if (obj === null || typeof obj !== 'object') {
+    return JSON.stringify(obj);
+  }
+  if (Array.isArray(obj)) {
+    return `[${obj.map(canonicalJsonStringify).join(',')}]`;
+  }
+  const keys = Object.keys(obj)
+    .filter((k) => obj[k] !== undefined)
+    .sort();
+  const pairs = keys.map(
+    (k) => `${JSON.stringify(k)}:${canonicalJsonStringify(obj[k])}`
+  );
+  return `{${pairs.join(',')}}`;
+}
 
 export class AuditLogger {
   private auditPath: string;
@@ -11,7 +33,8 @@ export class AuditLogger {
   private sequence: number = 0;
 
   constructor(auditPath?: string) {
-    this.auditPath = auditPath || path.join(process.cwd(), 'data', 'audit.jsonl');
+    this.auditPath =
+      auditPath || path.join(process.cwd(), 'data', 'audit.jsonl');
     this.ensureDirectory();
     this.loadState();
   }
@@ -39,8 +62,9 @@ export class AuditLogger {
       previous_hash: this.lastHash,
     };
 
-    // Hash = SHA-256(previous_hash + canonical JSON of record)
-    const payload = this.lastHash + JSON.stringify(recordWithoutHash);
+    // Hash = SHA-256(previous_hash + deterministic canonical JSON of record)
+    const payload =
+      this.lastHash + canonicalJsonStringify(recordWithoutHash);
     const recordHash = crypto
       .createHash('sha256')
       .update(payload)

@@ -1,14 +1,27 @@
+export type OpportunityType =
+  | 'abandoned_checkout'
+  | 'failed_payment'
+  | 'upsell'
+  | 're_engagement';
+
 export type ActionType =
   | 'discounted_payment_link'
   | 'payment_reminder'
   | 'upsell_payment_link'
   | 'retry_payment_link';
 
-export type OpportunityType =
-  | 'abandoned_checkout'
-  | 'failed_payment'
-  | 'upsell'
-  | 're_engagement';
+export interface CustomerProfile {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  tier: string;
+  lifetime_spend_paise: number;
+  total_orders: number;
+  first_purchase_date?: string | null;
+  last_purchase_date?: string | null;
+  notes?: string | null;
+}
 
 export interface AgentProposal {
   customer_id: string;
@@ -16,24 +29,11 @@ export interface AgentProposal {
   amount_paise: number;
   discount_percent: number;
   expiry_hours: number;
+  confidence_score?: number;
   reason: string;
   opportunity_type: OpportunityType;
-  confidence_score?: number;
-  evidence: {
-    cart_value_paise?: number;
-    cart_value?: number;
-    abandonment_time?: string;
-    lifetime_spend_paise?: number;
-    last_purchase_days_ago?: number;
-    failed_payment_count?: number;
-    cart_abandoned_hours_ago?: number;
-    failure_reason?: string;
-    attempts?: number;
-    [key: string]: any;
-  };
+  evidence: Record<string, any>;
 }
-
-export type PolicyVerdict = 'APPROVED' | 'BLOCKED';
 
 export interface PolicyViolation {
   rule: string;
@@ -43,7 +43,7 @@ export interface PolicyViolation {
 }
 
 export interface PolicyResult {
-  verdict: PolicyVerdict;
+  verdict: 'APPROVED' | 'BLOCKED';
   proposal: AgentProposal;
   violations: PolicyViolation[];
   checked_at: string;
@@ -54,8 +54,16 @@ export interface ExecutionResult {
   razorpay_order_id?: string;
   razorpay_payment_link_id?: string;
   razorpay_short_url?: string;
-  idempotency_key: string;
+  idempotency_key?: string;
   error?: string;
+}
+
+export interface LLMReasoningMetadata {
+  raw_response?: string;
+  model: string;
+  latency_ms: number;
+  used_fallback: boolean;
+  fallback_reason?: string;
 }
 
 export interface AuditRecord {
@@ -64,48 +72,17 @@ export interface AuditRecord {
   proposal: AgentProposal;
   policy_result: PolicyResult;
   execution_result?: ExecutionResult;
+  llm_reasoning?: LLMReasoningMetadata;
   previous_hash: string;
   record_hash: string;
-}
-
-export interface AuditVerificationResult {
-  valid: boolean;
-  total_records: number;
-  verified_records: number;
-  broken_sequence?: number;
-  error?: string;
-  tampered_at?: {
-    sequence: number;
-    expected_hash: string;
-    actual_hash: string;
-  };
 }
 
 export interface ProcessedAction {
   proposal: AgentProposal;
   verdict: PolicyResult;
   execution?: ExecutionResult;
-  auditRecord: AuditRecord;
+  auditRecord?: AuditRecord;
   customerName?: string;
-}
-
-export type AutopilotEvent =
-  | { type: 'start'; total_opportunities: number }
-  | { type: 'detection_complete'; count: number }
-  | { type: 'proposal'; proposal: AgentProposal }
-  | { type: 'verdict'; verdict: PolicyResult }
-  | { type: 'execution'; execution: ExecutionResult }
-  | { type: 'processed'; item: ProcessedAction }
-  | { type: 'complete'; summary: AutopilotResult };
-
-export interface AutopilotResult {
-  total_opportunities: number;
-  approved_count: number;
-  blocked_count: number;
-  unsafe_value_blocked_paise: number;
-  approved_value_paise: number;
-  duration_ms: number;
-  results: ProcessedAction[];
 }
 
 export interface DashboardSummary {
@@ -131,13 +108,13 @@ export interface DashboardSummary {
 }
 
 export interface CohortPerformance {
-  cohort_key: string;
+  cohort_key: OpportunityType;
   label: string;
   count: number;
   volume_paise: number;
   conversion_rate_pct: number;
   percentage_of_total: number;
-  color: string;
+  color?: string;
 }
 
 export interface TimeSeriesPoint {
@@ -147,11 +124,11 @@ export interface TimeSeriesPoint {
   recovered_paise: number;
 }
 
-export interface RuleCatchItem {
+export interface RuleCatchDistribution {
   rule: string;
   count: number;
   percentage: number;
-  color: string;
+  color?: string;
 }
 
 export interface TelemetryBenchmarks {
@@ -168,13 +145,35 @@ export interface TelemetryBenchmarks {
   p99_ledger_ms: number;
   p99_llm_ms: number;
   throughput_ops_sec: number;
-  rule_catches: RuleCatchItem[];
+  rule_catches: RuleCatchDistribution[];
 }
 
 export interface SystemSettings {
   model: string;
-  autonomy_mode: string;
+  autonomy_mode: 'autonomous' | 'supervised';
   max_discount_percent: number;
   max_expiry_hours: number;
   high_value_threshold_paise: number;
+  updated_at?: string;
 }
+
+export interface AuditVerificationResult {
+  valid: boolean;
+  total_records: number;
+  verified_records: number;
+  tampered_at?: {
+    sequence: number;
+    expected_hash: string;
+    actual_hash: string;
+    record_timestamp: string;
+  };
+}
+
+export type AutopilotEvent =
+  | { type: 'start'; total_opportunities: number }
+  | { type: 'detection_complete'; count: number }
+  | { type: 'proposal'; proposal: AgentProposal }
+  | { type: 'verdict'; verdict: PolicyResult }
+  | { type: 'execution'; execution?: ExecutionResult }
+  | { type: 'processed'; item: ProcessedAction }
+  | { type: 'complete'; summary: any };

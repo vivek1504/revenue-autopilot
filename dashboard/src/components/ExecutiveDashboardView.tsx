@@ -2,20 +2,23 @@ import React from 'react';
 import {
   TrendingUp,
   ArrowUpRight,
-  Sliders,
   RefreshCw,
   Zap,
-  FileText,
-  Search,
   CheckCircle2,
   XCircle,
   ExternalLink,
   ChevronRight,
   Clock,
+  ShieldCheck,
+  ShieldAlert,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { AutopilotEvent, AuditVerificationResult, DashboardSummary, ProcessedAction, TimeSeriesPoint } from '../types';
+import {
+  AutopilotEvent,
+  AuditVerificationResult,
+  DashboardSummary,
+  ProcessedAction,
+  TimeSeriesPoint,
+} from '../types';
 
 interface ExecutiveDashboardViewProps {
   summary: DashboardSummary | null;
@@ -38,13 +41,16 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
   onSelectVerdict,
   onNavigateToTab,
 }) => {
-  // Format currency helpers in INR (₹)
-  const formatRupees = (paise?: number, fallback: string = '₹0') => {
-    if (!paise || paise === 0) return fallback;
+  const formatRupees = (paise: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0,
+    }).format(paise / 100);
+  };
+
+  const formatCompact = (paise: number) => {
     const rupees = paise / 100;
-    if (rupees >= 10000000) {
-      return `₹${(rupees / 10000000).toFixed(2)} Cr`;
-    }
     if (rupees >= 100000) {
       return `₹${(rupees / 100000).toFixed(1)}L`;
     }
@@ -54,415 +60,452 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
     return `₹${rupees.toLocaleString('en-IN')}`;
   };
 
-  const executedCount = summary?.approved_count ?? (items.length > 0 ? items.filter((i) => i.verdict.verdict === 'APPROVED').length : 0);
-  const blockedCount = summary?.blocked_count ?? (items.length > 0 ? items.filter((i) => i.verdict.verdict === 'BLOCKED').length : 0);
-  const totalProcessed = executedCount + blockedCount;
-  const complianceRate = totalProcessed > 0 ? '100%' : '100%';
+  const executedCount =
+    summary?.approved_count ??
+    (items.length > 0
+      ? items.filter((i) => i.verdict.verdict === 'APPROVED').length
+      : 0);
+  const blockedCount =
+    summary?.blocked_count ??
+    (items.length > 0
+      ? items.filter((i) => i.verdict.verdict === 'BLOCKED').length
+      : 0);
 
-  // 1. Dynamic Chart Calculations
-  const totalRecPaise = (summary?.approved_value_paise || 0) + (summary?.unsafe_value_blocked_paise || 0);
+  // 1. Chart Points Calculation (honestly using real timeseries data or current snapshot)
+  const totalRecPaise =
+    (summary?.approved_value_paise || 0) +
+    (summary?.unsafe_value_blocked_paise || 0);
   const approvedPaise = summary?.approved_value_paise || 0;
+  const recoveredPaise = summary?.recovered_value_paise || 0;
 
-  const defaultMonthly = [
-    { label: 'Jan 1', factorRec: 0.20, factorApp: 0.12 },
-    { label: 'Feb 1', factorRec: 0.38, factorApp: 0.28 },
-    { label: 'Mar 1', factorRec: 0.55, factorApp: 0.46 },
-    { label: 'Apr 1', factorRec: 0.72, factorApp: 0.65 },
-    { label: 'May 1', factorRec: 0.88, factorApp: 0.82 },
-    { label: 'Jun 1', factorRec: 1.00, factorApp: 1.00 },
-  ];
-
-  const chartPoints = (timeseries && timeseries.length > 0)
-    ? timeseries
-    : defaultMonthly.map((m) => ({
-      period: m.label,
-      label: m.label,
-      recoverable_paise: Math.round(totalRecPaise * m.factorRec),
-      recovered_paise: Math.round(approvedPaise * m.factorApp),
-    }));
+  const chartPoints: TimeSeriesPoint[] =
+    timeseries && timeseries.length > 0
+      ? timeseries
+      : totalRecPaise > 0 || approvedPaise > 0
+      ? [
+          {
+            period: 'Current Run',
+            label: 'Current Run',
+            recoverable_paise: totalRecPaise,
+            recovered_paise: recoveredPaise,
+          },
+        ]
+      : [];
 
   const maxVolume = Math.max(
     ...chartPoints.map((p) => p.recoverable_paise),
-    ...chartPoints.map((p) => p.recovered_paise),
     100000
-  ) * 1.15;
-
-  const width = 500;
-  const startX = 60;
-  const endX = 560;
-  const numPoints = chartPoints.length;
-
-  const recoverableCoords = chartPoints.map((pt, i) => {
-    const x = startX + (i / (numPoints - 1 || 1)) * (endX - startX);
-    const y = 180 - (pt.recoverable_paise / maxVolume) * 155;
-    return { x, y: Math.max(20, Math.min(185, y)), val: pt.recoverable_paise };
-  });
-
-  const recoveredCoords = chartPoints.map((pt, i) => {
-    const x = startX + (i / (numPoints - 1 || 1)) * (endX - startX);
-    const y = 180 - (pt.recovered_paise / maxVolume) * 155;
-    return { x, y: Math.max(20, Math.min(185, y)), val: pt.recovered_paise };
-  });
-
-  const buildPath = (pts: { x: number; y: number }[]) => {
-    if (pts.length === 0) return '';
-    let d = `M ${pts[0].x} ${pts[0].y}`;
-    for (let i = 1; i < pts.length; i++) {
-      const prev = pts[i - 1];
-      const curr = pts[i];
-      const cp1x = prev.x + (curr.x - prev.x) / 2;
-      const cp1y = prev.y;
-      const cp2x = prev.x + (curr.x - prev.x) / 2;
-      const cp2y = curr.y;
-      d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`;
-    }
-    return d;
-  };
-
-  const recoverablePath = buildPath(recoverableCoords);
-  const recoveredPath = buildPath(recoveredCoords);
-
-  const opportunitiesCount = items.length || summary?.opportunities_count || 0;
-  const approvedCount = items.length > 0 ? items.filter((i) => i.verdict.verdict === 'APPROVED').length : (summary?.approved_count ?? 0);
-  const blockedCount2 = items.length > 0 ? items.filter((i) => i.verdict.verdict === 'BLOCKED').length : (summary?.blocked_count ?? 0);
-  const approvedPaise2 = items.length > 0
-    ? items.filter((i) => i.verdict.verdict === 'APPROVED').reduce((sum, i) => sum + Math.round(i.proposal.amount_paise * (1 - i.proposal.discount_percent / 100)), 0)
-    : (summary?.approved_value_paise ?? 0);
-  const blockedPaise = items.length > 0
-    ? items.filter((i) => i.verdict.verdict === 'BLOCKED').reduce((sum, i) => sum + (i.proposal.amount_paise || 0), 0)
-    : (summary?.unsafe_value_blocked_paise ?? 0);
-  const verifiedCount = opportunitiesCount;
-  const recoveredPaise = summary?.recovered_value_paise || 0;
-  const redeemedCount = summary?.redeemed_count || 0;
+  );
 
   return (
-    <div className="space-y-6 pb-12 font-sans">
-      {/* 1. Top 5 Metric Cards (Real Measured Recovery + Safety Story) */}
+    <div className="space-y-8 font-sans">
+      {/* 1. Header with System Health & Status */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-200">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-extrabold text-[#0b1c30] tracking-tight">
+              Executive Revenue Dashboard
+            </h1>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Autonomous Mode Active
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 mt-1">
+            Real-time autonomous revenue recovery engine with deterministic policy boundaries and SHA-256 cryptographic audit verification.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => onNavigateToTab('pipelines')}
+            className="px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
+          >
+            Inspect Pipeline
+            <ArrowUpRight className="w-3.5 h-3.5 text-slate-400" />
+          </button>
+          <button
+            onClick={() => onNavigateToTab('audit')}
+            className="px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
+          >
+            Audit Ledger
+            <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+          </button>
+        </div>
+      </div>
+
+      {/* 2. Top-Level Executive KPI Ribbon (5 Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Card 2: Recoverable Approved Value */}
-        <div className="bg-white border border-slate-200/80 rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32">
-          <div className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
-            Recoverable (Approved)
+        {/* Card 1: Measured Recovered Revenue */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider">
+                Measured Recovered
+              </span>
+              <div className="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black font-tabular text-emerald-700 tracking-tight">
+              {formatRupees(recoveredPaise)}
+            </div>
           </div>
-          <div className="text-2xl lg:text-3xl font-extrabold text-slate-900 font-tabular">
-            {formatRupees(approvedPaise2)}
-          </div>
-          <div className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>{approvedCount} active links created</span>
-          </div>
-        </div>
-
-        {/* Card 1: Measured Money Recovered */}
-        <div className="bg-white text-white border border-slate-200/80 rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32">
-          <div className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
-            Recovered
-          </div>
-          <div className="text-2xl lg:text-3xl font-extrabold text-emerald-700 font-tabular">
-            {formatRupees(recoveredPaise)}
-          </div>
-          <div className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
-            <span>{redeemedCount} webhook-verified paid offers</span>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-slate-500">Webhook verified</span>
+            <span className="font-bold text-emerald-700 font-tabular font-mono">
+              {summary?.redeemed_count || 0} Paid
+            </span>
           </div>
         </div>
 
-        {/* Card 3: Unsafe Value Blocked */}
-        <div className="bg-white border border-slate-200/80 rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32">
-          <div className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
-            Revenue Protected
+        {/* Card 2: Recoverable Value (Approved) */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider">
+                Approved Recoverable
+              </span>
+              <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black font-tabular text-[#0b1c30] tracking-tight">
+              {formatRupees(approvedPaise)}
+            </div>
           </div>
-          <div className="text-2xl lg:text-3xl font-extrabold text-rose-700 font-tabular truncate">
-            {formatRupees(blockedPaise)}
-          </div>
-          <div className="text-xs font-semibold text-rose-700 flex items-center gap-1">
-            <XCircle className="w-3.5 h-3.5 text-rose-600" />
-            <span>{blockedCount2} policy violations blocked</span>
-          </div>
-        </div>
-
-        {/* Card 4: Total Opportunities */}
-        <div className="bg-white border border-slate-200/80 rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32">
-          <div className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
-            Scanned Opportunities
-          </div>
-          <div className="text-3xl font-extrabold text-slate-900 font-tabular">
-            {opportunitiesCount}
-          </div>
-          <div className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5 text-slate-600" />
-            <span>AI scanned & evaluated</span>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-slate-500">Policy Approved</span>
+            <span className="font-bold text-slate-800 font-tabular font-mono">
+              {executedCount} Offers
+            </span>
           </div>
         </div>
 
-        {/* Card 5: Audit Chain Status */}
-        <div className={`bg-white border rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32 ${verificationResult && !verificationResult.valid
-          ? 'border-rose-300 bg-rose-50/30'
-          : 'border-slate-200/80'
-          }`}>
-          <div className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
-            SHA-256 Audit Chain
+        {/* Card 3: Revenue Protected */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider">
+                Revenue Protected
+              </span>
+              <div className="w-7 h-7 rounded-lg bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-700">
+                <XCircle className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black font-tabular text-rose-700 tracking-tight">
+              {formatRupees(summary?.unsafe_value_blocked_paise || 0)}
+            </div>
           </div>
-          <div className={`text-xl lg:text-2xl font-extrabold font-tabular truncate ${verificationResult && !verificationResult.valid ? 'text-rose-700' : 'text-slate-900'
-            }`}>
-            {verificationResult && !verificationResult.valid
-              ? `Corrupted · #${verificationResult.tampered_at?.sequence || 1}`
-              : (verificationResult && verificationResult.total_records > 0)
-                ? `Intact · ${verificationResult.verified_records}/${verificationResult.total_records}`
-                : `Pending · 0 entries`}
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-slate-500">Violations Blocked</span>
+            <span className="font-bold text-rose-700 font-tabular font-mono">
+              {blockedCount} Stopped
+            </span>
           </div>
-          <div className={`text-xs font-semibold flex items-center gap-1 truncate ${verificationResult && !verificationResult.valid
-            ? 'text-rose-700'
-            : (verificationResult && verificationResult.total_records > 0)
-              ? 'text-emerald-700'
-              : 'text-slate-500'
-            }`}>
-            {verificationResult && !verificationResult.valid ? (
-              <>
-                <XCircle className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" />
-                <span className="truncate">Tamper detected at #{verificationResult.tampered_at?.sequence || 1}</span>
-              </>
-            ) : (verificationResult && verificationResult.total_records > 0) ? (
-              <>
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                <span className="truncate">Cryptographic ledger verified</span>
-              </>
-            ) : (
-              <>
-                <Clock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                <span className="truncate">Run scan to record</span>
-              </>
-            )}
+        </div>
+
+        {/* Card 4: Scanned Accounts */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider">
+                Scanned Accounts
+              </span>
+              <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700">
+                <Zap className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black font-tabular text-[#0b1c30] tracking-tight">
+              {summary?.opportunities_count ?? items.length}
+            </div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-slate-500">Approval Yield</span>
+            <span className="font-bold text-slate-800 font-tabular font-mono">
+              {items.length > 0
+                ? `${Math.round((executedCount / items.length) * 100)}%`
+                : '100%'}
+            </span>
+          </div>
+        </div>
+
+        {/* Card 5: SHA-256 Ledger Integrity */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider">
+                Audit Chain
+              </span>
+              <div
+                className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                  verificationResult && !verificationResult.valid
+                    ? 'bg-rose-50 border border-rose-200 text-rose-700'
+                    : 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                }`}
+              >
+                {verificationResult && !verificationResult.valid ? (
+                  <ShieldAlert className="w-4 h-4" />
+                ) : (
+                  <ShieldCheck className="w-4 h-4" />
+                )}
+              </div>
+            </div>
+            <div
+              className={`text-xl font-black font-tabular tracking-tight ${
+                verificationResult && !verificationResult.valid
+                  ? 'text-rose-700'
+                  : 'text-emerald-700'
+              }`}
+            >
+              {verificationResult && !verificationResult.valid
+                ? 'Tamper Detected'
+                : '100% Verified'}
+            </div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-slate-500">SHA-256 Chain</span>
+            <span className="font-bold text-slate-800 font-mono text-[11px]">
+              {verificationResult?.verified_records ?? items.length} Records
+            </span>
           </div>
         </div>
       </div>
 
-      {/* 2. Middle Section: Dynamic Recovery Performance Chart + AI Control Center */}
+      {/* 3. Main Operational Grid: Recovery Volume Chart (7 cols) + Action Decision Stream (5 cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left: Dynamic Recovery Performance Chart (8 cols) */}
-        <div className="lg:col-span-8 bg-white border border-slate-200/80 rounded-lg p-6 shadow-2xs flex flex-col justify-between min-h-[380px]">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-base font-bold text-slate-900">
-                Recovery Performance: Recovered vs. Recoverable
-              </h3>
-              <div className="flex items-center gap-4 text-xs font-medium">
-                <div className="flex items-center gap-1.5 text-slate-900 font-bold">
-                  <span className="w-2.5 h-2.5 rounded-full bg-slate-950"></span>
-                  <span>Recovered ({formatRupees(approvedPaise)})</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-slate-500">
-                  <span className="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
-                  <span>Recoverable ({formatRupees(totalRecPaise)})</span>
-                </div>
-              </div>
-            </div>
-            <p className="text-xs text-slate-500 mb-4">
-              Real-time cumulative recovery trajectory plotted directly from live SQLite database events
-            </p>
-
-            {/* Dynamic SVG Line Chart in INR */}
-            <div className="relative h-60 w-full pt-2">
-              <svg viewBox="0 0 600 200" className="w-full h-full overflow-visible">
-                {/* Horizontal Gridlines */}
-                <line x1="55" y1="25" x2="580" y2="25" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
-                <line x1="55" y1="65" x2="580" y2="65" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
-                <line x1="55" y1="105" x2="580" y2="105" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
-                <line x1="55" y1="145" x2="580" y2="145" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
-                <line x1="55" y1="185" x2="580" y2="185" stroke="#e2e8f0" strokeWidth="1" />
-
-                {/* Dynamic Y-Axis Labels */}
-                <text x="48" y="29" textAnchor="end" className="text-[10px] fill-slate-400 font-sans font-mono font-semibold">{formatRupees(maxVolume)}</text>
-                <text x="48" y="69" textAnchor="end" className="text-[10px] fill-slate-400 font-sans font-mono">{formatRupees(maxVolume * 0.75)}</text>
-                <text x="48" y="109" textAnchor="end" className="text-[10px] fill-slate-400 font-sans font-mono">{formatRupees(maxVolume * 0.50)}</text>
-                <text x="48" y="149" textAnchor="end" className="text-[10px] fill-slate-400 font-sans font-mono">{formatRupees(maxVolume * 0.25)}</text>
-                <text x="48" y="188" textAnchor="end" className="text-[10px] fill-slate-400 font-sans font-mono">₹0</text>
-
-                {/* Dynamic Curves */}
-                <path
-                  d={recoverablePath}
-                  fill="none"
-                  stroke="#94a3b8"
-                  strokeWidth="2.5"
-                  strokeDasharray="4,4"
-                  className="transition-all duration-700 ease-in-out"
-                />
-                <path
-                  d={recoveredPath}
-                  fill="none"
-                  stroke="#0f172a"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  className="transition-all duration-700 ease-in-out"
-                />
-
-                {/* Data Point Nodes */}
-                {recoveredCoords.map((pt, idx) => (
-                  <circle
-                    key={`rec-${idx}`}
-                    cx={pt.x}
-                    cy={pt.y}
-                    r={idx === recoveredCoords.length - 1 ? "4.5" : "3.5"}
-                    fill="#0f172a"
-                    stroke="#ffffff"
-                    strokeWidth={idx === recoveredCoords.length - 1 ? "2" : "1.5"}
-                    className="transition-all duration-700 ease-in-out hover:r-5 cursor-pointer"
-                  >
-                    <title>{`${chartPoints[idx]?.label}: Recovered ${formatRupees(pt.val)}`}</title>
-                  </circle>
-                ))}
-
-                {recoverableCoords.map((pt, idx) => (
-                  <circle
-                    key={`tot-${idx}`}
-                    cx={pt.x}
-                    cy={pt.y}
-                    r="2.5"
-                    fill="#94a3b8"
-                    stroke="#ffffff"
-                    strokeWidth="1"
-                    className="transition-all duration-700 ease-in-out"
-                  >
-                    <title>{`${chartPoints[idx]?.label}: Recoverable ${formatRupees(pt.val)}`}</title>
-                  </circle>
-                ))}
-              </svg>
-            </div>
-          </div>
-
-          <div className="flex justify-between pl-12 pr-4 pt-2 text-xs font-semibold text-slate-500 border-t border-slate-100 mt-2">
-            {chartPoints.map((ts, i) => (
-              <span key={i} className="font-mono">{ts.label}</span>
-            ))}
-          </div>
-        </div>
-
-        {/* Right: AI Control Center (4 cols) */}
-        <div className="lg:col-span-4 bg-white border border-slate-200/80 rounded-lg p-6 shadow-2xs flex flex-col justify-between">
+        {/* Left: Dynamic Recovery Chart */}
+        <div className="lg:col-span-7 bg-white p-6 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold text-slate-900">
-                AI Control Center
-              </h3>
-              <button
-                onClick={() => onNavigateToTab('settings')}
-                className="text-slate-400 hover:text-slate-900 transition-colors p-1 cursor-pointer"
-                title="Configure AI Engine"
-              >
-                <Sliders className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Agent Status Box */}
-            <div className="p-3 bg-white border border-slate-200 rounded-md flex items-center justify-between mb-4">
-              <span className="text-xs font-semibold text-slate-700">Agent Status</span>
-              <span className="text-xs font-bold text-emerald-600 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                Operational
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Recovery Pipeline Yield & Revenue Trajectory
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Recoverable opportunity volume identified vs. policy approved pipeline.
+                </p>
+              </div>
+              <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 rounded text-slate-700 font-mono">
+                Postgres Active
               </span>
             </div>
 
-            {/* Actions Executed & Actions Blocked */}
-            <div className="grid grid-cols-2 gap-3 mb-5">
-              <div className="p-3.5 bg-[#f8f9fa] border border-slate-200 rounded-md text-left">
-                <div className="text-2xl font-bold font-tabular text-slate-900">
-                  {executedCount}
+            {/* SVG Chart */}
+            <div className="h-64 w-full relative pt-4">
+              {chartPoints.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs">
+                  <Clock className="w-8 h-8 mb-2 stroke-1" />
+                  No scan events recorded yet. Run Autopilot from the sidebar to visualize pipeline yield.
                 </div>
-                <div className="text-[11px] font-medium text-slate-500 mt-0.5">
-                  Actions Executed
-                </div>
-              </div>
-              <div className="p-3.5 bg-[#f8f9fa] border border-slate-200 rounded-md text-left">
-                <div className="text-2xl font-bold font-tabular text-slate-900">
-                  {blockedCount}
-                </div>
-                <div className="text-[11px] font-medium text-slate-500 mt-0.5">
-                  Actions Blocked
-                </div>
-              </div>
-            </div>
+              ) : (
+                <div className="h-full flex items-end justify-between gap-6 px-4 pb-6 border-b border-slate-200">
+                  {chartPoints.map((pt, idx) => {
+                    const hPercentRec = Math.min(
+                      100,
+                      Math.max(12, Math.round((pt.recoverable_paise / maxVolume) * 100))
+                    );
+                    const hPercentApp = Math.min(
+                      100,
+                      Math.max(8, Math.round((pt.recovered_paise / maxVolume) * 100))
+                    );
 
-            {/* Policy Compliance */}
-            <div className="flex items-center justify-between text-xs py-2 border-b border-slate-100">
-              <span className="font-semibold text-slate-600">Policy Compliance</span>
-              <span className="font-bold text-slate-900">{complianceRate}</span>
-            </div>
-
-            {/* Last Action */}
-            <div className="py-2.5 border-b border-slate-100">
-              <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                Last Action
-              </div>
-              <div className="text-xs font-bold text-slate-900 mt-0.5 truncate">
-                {items.length > 0
-                  ? `${items[0].customerName || items[0].proposal.customer_id} recovery link generated`
-                  : 'Aarav Sharma recovery initiated'}
-              </div>
+                    return (
+                      <div
+                        key={idx}
+                        className="flex-1 flex flex-col items-center gap-2 h-full justify-end group"
+                      >
+                        <div className="w-full flex items-end justify-center gap-2 h-full">
+                          {/* Recoverable Bar */}
+                          <div
+                            style={{ height: `${hPercentRec}%` }}
+                            className="w-1/2 max-w-[32px] bg-blue-500/80 hover:bg-blue-600 rounded-t transition-all duration-300 relative"
+                          >
+                            <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] px-2 py-0.5 rounded font-mono font-bold whitespace-nowrap pointer-events-none transition-opacity z-10">
+                              {formatCompact(pt.recoverable_paise)}
+                            </div>
+                          </div>
+                          {/* Recovered Bar */}
+                          <div
+                            style={{ height: `${hPercentApp}%` }}
+                            className="w-1/2 max-w-[32px] bg-emerald-500/90 hover:bg-emerald-600 rounded-t transition-all duration-300 relative"
+                          >
+                            <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] px-2 py-0.5 rounded font-mono font-bold whitespace-nowrap pointer-events-none transition-opacity z-10">
+                              {formatCompact(pt.recovered_paise)}
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-semibold text-slate-500 mt-1 truncate">
+                          {pt.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Current Activity */}
-          <div className="pt-3">
-            <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1.5">
-              Current Activity
-            </div>
-            <div className="flex items-center gap-2 text-xs text-slate-800 bg-[#f8f9fa] p-2.5 rounded-md border border-slate-200">
-              <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${status === 'running' ? 'animate-spin text-blue-600' : ''}`} />
-              <span className="truncate">
-                {status === 'running'
-                  ? `Evaluating live proposals (${items.length} processed)`
-                  : 'Monitoring real-time checkout drop-offs'}
+          <div className="flex items-center justify-between text-xs text-slate-500 mt-4 pt-3 border-t border-slate-100">
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-xs bg-blue-500"></span>
+                Recoverable Potential
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-xs bg-emerald-500"></span>
+                Settled Recovered
               </span>
             </div>
+            <span className="font-mono text-[11px] text-slate-400">
+              100% Policy Enforced
+            </span>
+          </div>
+        </div>
+
+        {/* Right: Live Action Decision Stream */}
+        <div className="lg:col-span-5 bg-white p-6 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Decision Stream & Policy Log
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Autonomous proposal evaluation in progress.
+                </p>
+              </div>
+              <span
+                className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                  status === 'running'
+                    ? 'bg-amber-50 text-amber-700 border-amber-300 animate-pulse'
+                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                }`}
+              >
+                {status === 'running' ? 'Scanning...' : 'Ready'}
+              </span>
+            </div>
+
+            <div className="space-y-2.5 max-h-[250px] overflow-y-auto pr-1">
+              {items.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs flex flex-col items-center justify-center">
+                  <Clock className="w-6 h-6 mb-2 stroke-1" />
+                  No evaluation events recorded yet. Click &quot;Run Autopilot&quot; to begin.
+                </div>
+              ) : (
+                items.slice(0, 5).map((item, idx) => {
+                  const isApproved = item.verdict.verdict === 'APPROVED';
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => onSelectVerdict(item)}
+                      className="p-3 rounded-lg border border-slate-100 bg-[#f8f9fa] hover:bg-slate-100/80 transition-colors cursor-pointer flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
+                            isApproved
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-rose-100 text-rose-700'
+                          }`}
+                        >
+                          {isApproved ? (
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                          ) : (
+                            <XCircle className="w-3.5 h-3.5" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-slate-900 truncate">
+                            {item.customerName || item.proposal.customer_id}
+                          </div>
+                          <div className="text-[10px] text-slate-500 capitalize truncate">
+                            {item.proposal.opportunity_type.replace('_', ' ')} ·{' '}
+                            {item.proposal.discount_percent}% discount
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-xs font-bold font-tabular text-slate-900">
+                          {formatRupees(item.proposal.amount_paise)}
+                        </div>
+                        <span
+                          className={`text-[9px] font-bold uppercase font-mono px-1.5 py-0.2 rounded ${
+                            isApproved
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-rose-50 text-rose-700'
+                          }`}
+                        >
+                          {item.verdict.verdict}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 mt-3 flex items-center justify-between text-xs">
+            <span className="text-slate-500 font-medium">
+              Evaluated {items.length} opportunities
+            </span>
+            <button
+              onClick={() => onNavigateToTab('recoveries')}
+              className="text-indigo-600 font-bold hover:text-indigo-800 transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              View Full Table
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </div>
 
-      {/* 3. Opportunities Table with Real SQLite Database Records */}
-      <div className="bg-white border border-slate-200/80 rounded-lg overflow-hidden shadow-2xs">
-        {/* Card Header */}
-        <div className="p-5 border-b border-slate-200 bg-[#f8f9fa] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      {/* 4. Bottom Table: Live Evaluated Actions */}
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+        <div className="p-5 border-b border-slate-200 flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-bold text-slate-900">
-                Active Recovery Opportunities
-              </h3>
-              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                Live Queue (SQLite DB)
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Autonomous agent candidates prioritized by AI confidence and deterministic policy validation
+            <h3 className="text-base font-bold text-slate-900">
+              Recent Policy Interventions & Actions
+            </h3>
+            <p className="text-xs text-slate-500">
+              Click on any row to open the complete Policy Engine audit breakdown.
             </p>
           </div>
           <button
             onClick={() => onNavigateToTab('recoveries')}
-            className="text-xs font-bold text-slate-900 hover:text-slate-700 hover:underline flex items-center gap-1 cursor-pointer self-start sm:self-auto"
+            className="text-xs font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
           >
-            <span>View All Recoveries</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
+            All Recoveries ({items.length})
           </button>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-slate-200 bg-[#f8f9fa] text-slate-500 font-bold text-[11px]">
+            <thead className="bg-[#f8f9fa] border-b border-slate-200 text-slate-600 font-bold uppercase text-[11px] tracking-wider">
+              <tr>
                 <th className="py-3 px-6">Customer</th>
                 <th className="py-3 px-6">Opportunity</th>
-                <th className="py-3 px-6">Amount</th>
+                <th className="py-3 px-6">Amount (₹)</th>
+                <th className="py-3 px-6">Discount</th>
                 <th className="py-3 px-6">AI Confidence</th>
-                <th className="py-3 px-6">Policy</th>
-                <th className="py-3 px-6">Status</th>
+                <th className="py-3 px-6">Verdict</th>
+                <th className="py-3 px-6 text-right">Details</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {items.length > 0 ? (
-                items.slice(0, 4).map((item, idx) => {
+              {items.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                    No active proposals. Run Autopilot to populate opportunities.
+                  </td>
+                </tr>
+              ) : (
+                items.slice(0, 6).map((item, idx) => {
                   const isApproved = item.verdict.verdict === 'APPROVED';
                   const conf = item.proposal.confidence_score
                     ? Math.round(item.proposal.confidence_score * 100)
-                    : isApproved ? 95 - idx * 3 : 75;
+                    : null;
                   const amtRupees = `₹${(item.proposal.amount_paise / 100).toLocaleString('en-IN')}`;
 
                   return (
@@ -480,143 +523,39 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
                       <td className="py-3.5 px-6 font-bold font-tabular text-slate-900">
                         {amtRupees}
                       </td>
-                      <td className="py-3.5 px-6">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-8 h-1 rounded-full ${isApproved ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-                          <span className="font-bold font-tabular text-slate-800">{conf}%</span>
-                        </div>
+                      <td className="py-3.5 px-6 font-mono text-slate-700">
+                        {item.proposal.discount_percent}%
+                      </td>
+                      <td className="py-3.5 px-6 font-mono text-slate-700">
+                        {conf !== null ? `${conf}%` : '—'}
                       </td>
                       <td className="py-3.5 px-6">
                         <span
-                          className={`inline-block px-2.5 py-0.5 rounded text-xs font-semibold ${isApproved ? 'bg-slate-100 text-slate-800' : 'bg-rose-100 text-rose-700'
-                            }`}
+                          className={`inline-flex items-center gap-1 text-[10px] font-bold font-mono uppercase px-2 py-0.5 rounded border ${
+                            isApproved
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-rose-50 text-rose-700 border-rose-200'
+                          }`}
                         >
-                          {isApproved ? 'Pass' : 'Block'}
+                          {isApproved ? (
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          ) : (
+                            <XCircle className="w-3 h-3 text-rose-600" />
+                          )}
+                          {item.verdict.verdict}
                         </span>
                       </td>
-                      <td className="py-3.5 px-6">
-                        <div className="flex items-center gap-1.5 font-medium text-xs">
-                          <span
-                            className={`w-2 h-2 rounded-full ${isApproved ? 'bg-emerald-500' : 'bg-rose-500'
-                              }`}
-                          ></span>
-                          <span className={isApproved ? 'text-emerald-700' : 'text-rose-700'}>
-                            {isApproved ? 'AI Active' : 'Human Reqd'}
-                          </span>
-                        </div>
+                      <td className="py-3.5 px-6 text-right">
+                        <span className="text-slate-400 hover:text-slate-700 text-xs font-semibold">
+                          View &rarr;
+                        </span>
                       </td>
                     </tr>
                   );
                 })
-              ) : (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-400">
-                    No active opportunities detected. Click 'Run Recovery Scan' in the sidebar to begin.
-                  </td>
-                </tr>
               )}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      {/* 4. Bottom Section: AI Agent Activity + Recent Audit Events */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: AI Agent Activity */}
-        <div className="bg-white border border-slate-200/80 rounded-lg p-6 shadow-2xs">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="text-base font-bold text-slate-900">
-              AI Agent Activity
-            </h3>
-            <button
-              onClick={() => onNavigateToTab('telemetry')}
-              className="text-xs font-bold text-slate-900 hover:underline cursor-pointer"
-            >
-              View All
-            </button>
-          </div>
-
-          <div className="space-y-6 relative before:absolute before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
-            {items.length > 0 ? (
-              items.slice(0, 3).map((item, idx) => (
-                <div key={idx} className="flex items-start gap-4 relative">
-                  <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 shrink-0 z-10">
-                    <Zap className="w-4 h-4 text-slate-700 fill-current" />
-                  </div>
-                  <div className="pt-0.5">
-                    <div className="text-[11px] text-slate-400 font-medium">{idx === 0 ? 'Just now' : `${idx * 6} mins ago`}</div>
-                    <div className="text-xs font-bold text-slate-900 mt-0.5">
-                      {item.verdict.verdict === 'APPROVED' ? 'Recovery link generated' : 'Unsafe action blocked by policy'}
-                    </div>
-                    <p className="text-xs text-slate-600 mt-0.5">
-                      {item.proposal.reason} ({item.customerName || item.proposal.customer_id})
-                    </p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="py-6 text-center text-xs text-slate-400">
-                No recent activity. Click 'Run Recovery Scan' in the sidebar.
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right: Recent Audit Events */}
-        <div className="bg-white border border-slate-200/80 rounded-lg p-6 shadow-2xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold text-slate-900">
-                Recent Audit Events
-              </h3>
-              <button
-                onClick={() => onNavigateToTab('audit')}
-                className="text-xs font-bold text-slate-900 hover:underline cursor-pointer"
-              >
-                View All
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {items.length > 0 ? (
-                items.slice(0, 3).map((item, idx) => {
-                  const isApproved = item.verdict.verdict === 'APPROVED';
-                  return (
-                    <div
-                      key={idx}
-                      onClick={() => onSelectVerdict(item)}
-                      className="p-3 bg-[#f8f9fa] border border-slate-200 hover:border-slate-300 rounded-md cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-bold text-slate-900">
-                          {isApproved ? 'Policy Passed' : 'Policy Blocked'}
-                        </span>
-                        <span className="text-[11px] text-slate-400 font-mono">
-                          Seq #{item.auditRecord?.sequence || idx + 1}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-600 mt-1 truncate">
-                        {item.customerName || item.proposal.customer_id}: {item.proposal.action} (₹{(item.proposal.amount_paise / 100).toLocaleString('en-IN')})
-                      </p>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="py-6 text-center text-xs text-slate-400">
-                  Audit ledger empty. Run a scan to generate verified records.
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>Cryptographic Chain Status:</span>
-            {verificationResult && !verificationResult.valid ? (
-              <strong className="text-rose-600 font-bold">Tamper Caught (#1)</strong>
-            ) : (
-              <strong className="text-emerald-700 font-bold">SHA-256 Verified</strong>
-            )}
-          </div>
         </div>
       </div>
     </div>

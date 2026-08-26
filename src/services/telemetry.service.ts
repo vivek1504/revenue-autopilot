@@ -4,14 +4,19 @@ import { liveTelemetryStats } from '../index';
 import { config } from '../shared/config';
 
 export class TelemetryService {
-  public getBenchmarks(items: ProcessedAction[], auditRecords: AuditRecord[]): TelemetryBenchmarks {
+  public getBenchmarks(
+    items: ProcessedAction[],
+    auditRecords: AuditRecord[]
+  ): TelemetryBenchmarks {
     const auditVerification = verifyAuditIntegrity(config.auditPath);
 
     let discountCatches = 0;
-    let expiryCatches = 0;
-    let adversarialCatches = 0;
     let frequencyCatches = 0;
+    let expiryCatches = 0;
     let escalationCatches = 0;
+    let limitCatches = 0;
+    let confidenceCatches = 0;
+    let integrityCatches = 0;
     let blockedCount = 0;
 
     for (const rec of items) {
@@ -19,33 +24,49 @@ export class TelemetryService {
         blockedCount++;
         const violations = rec.verdict.violations || [];
         for (const v of violations) {
-          const ruleLower = (v.rule || '').toLowerCase();
-          const msgLower = (v.message || '').toLowerCase();
-          if (ruleLower.includes('discount') || msgLower.includes('discount')) {
+          const rule = (v.rule || '').toLowerCase();
+          if (rule === 'discount_limit' || rule === 'discount_for_action') {
             discountCatches++;
-          } else if (ruleLower.includes('expiry') || msgLower.includes('expiry') || ruleLower.includes('duration')) {
-            expiryCatches++;
-          } else if (ruleLower.includes('frequency') || msgLower.includes('contact')) {
+          } else if (rule === 'contact_frequency') {
             frequencyCatches++;
-          } else if (ruleLower.includes('escalation') || msgLower.includes('human')) {
+          } else if (rule === 'expiry_range') {
+            expiryCatches++;
+          } else if (rule === 'human_escalation') {
             escalationCatches++;
+          } else if (rule === 'amount_limit' || rule === 'amount_positive') {
+            limitCatches++;
+          } else if (rule === 'confidence_threshold') {
+            confidenceCatches++;
           } else {
-            adversarialCatches++;
+            integrityCatches++;
           }
         }
       }
     }
 
-    const totalCatches = discountCatches + expiryCatches + adversarialCatches + frequencyCatches + escalationCatches;
+    const totalCatches =
+      discountCatches +
+      frequencyCatches +
+      expiryCatches +
+      escalationCatches +
+      limitCatches +
+      confidenceCatches +
+      integrityCatches;
+
     const totalProposals = items.length;
-    const blockRatePct = totalProposals > 0 ? Math.round((blockedCount / totalProposals) * 100) : 0;
+    const blockRatePct =
+      totalProposals > 0
+        ? Math.round((blockedCount / totalProposals) * 100)
+        : 0;
 
     const confidences = items
       .map((r) => r.proposal.confidence_score)
       .filter((c): c is number => typeof c === 'number');
     const avgConfidence =
       confidences.length > 0
-        ? Math.round((confidences.reduce((a, b) => a + b, 0) / confidences.length) * 1000) / 10
+        ? Math.round(
+            (confidences.reduce((a, b) => a + b, 0) / confidences.length) * 1000
+          ) / 10
         : 0;
 
     return {
@@ -53,7 +74,7 @@ export class TelemetryService {
       block_rate_pct: blockRatePct,
       blocked_proposals_count: blockedCount,
       total_proposals_count: totalProposals,
-      avg_llm_latency_ms: liveTelemetryStats.p99_llm_ms || 0,
+      avg_llm_latency_ms: liveTelemetryStats.avg_llm_ms || 0,
       llm_call_count: totalProposals,
       verified_audit_records_count: auditRecords.length,
       hash_chain_intact: auditVerification.valid,
@@ -64,34 +85,48 @@ export class TelemetryService {
       throughput_ops_sec: liveTelemetryStats.throughput_ops_sec || 0,
       rule_catches: [
         {
-          rule: 'Discount Cap Violation (>15%)',
+          rule: 'Discount Ceiling Violation (>15%)',
           count: discountCatches,
-          percentage: totalCatches > 0 ? Math.round((discountCatches / totalCatches) * 100) : 0,
-          color: 'bg-rose-500',
+          percentage:
+            totalCatches > 0
+              ? Math.round((discountCatches / totalCatches) * 100)
+              : 0,
         },
         {
           rule: 'Contact Frequency Stopping Rule (3/7d)',
           count: frequencyCatches,
-          percentage: totalCatches > 0 ? Math.round((frequencyCatches / totalCatches) * 100) : 0,
-          color: 'bg-indigo-600',
+          percentage:
+            totalCatches > 0
+              ? Math.round((frequencyCatches / totalCatches) * 100)
+              : 0,
         },
         {
-          rule: 'Link Expiry Over Limit (>72h)',
-          count: expiryCatches,
-          percentage: totalCatches > 0 ? Math.round((expiryCatches / totalCatches) * 100) : 0,
-          color: 'bg-amber-500',
+          rule: 'Transaction Limit & Human Escalation (>₹10k/₹25k)',
+          count: limitCatches + escalationCatches,
+          percentage:
+            totalCatches > 0
+              ? Math.round(
+                  ((limitCatches + escalationCatches) / totalCatches) * 100
+                )
+              : 0,
         },
         {
-          rule: 'Human Escalation Threshold (>₹25k)',
-          count: escalationCatches,
-          percentage: totalCatches > 0 ? Math.round((escalationCatches / totalCatches) * 100) : 0,
-          color: 'bg-blue-600',
+          rule: 'AI Confidence Gate (<70%)',
+          count: confidenceCatches,
+          percentage:
+            totalCatches > 0
+              ? Math.round((confidenceCatches / totalCatches) * 100)
+              : 0,
         },
         {
-          rule: 'Adversarial Prompt Injection Note',
-          count: adversarialCatches,
-          percentage: totalCatches > 0 ? Math.round((adversarialCatches / totalCatches) * 100) : 0,
-          color: 'bg-purple-600',
+          rule: 'Data Integrity & Duplicate Guards',
+          count: expiryCatches + integrityCatches,
+          percentage:
+            totalCatches > 0
+              ? Math.round(
+                  ((expiryCatches + integrityCatches) / totalCatches) * 100
+                )
+              : 0,
         },
       ],
     };

@@ -23,6 +23,12 @@ export function createAuditRouter(): Router {
   });
 
   router.post('/tamper', (req: Request, res: Response): any => {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({
+        error: 'Audit tamper endpoint is disabled in production environments',
+      });
+    }
+
     const sequence = req.body.sequence || 1;
 
     if (!fs.existsSync(config.auditPath)) {
@@ -49,7 +55,9 @@ export function createAuditRouter(): Router {
       });
 
       if (!tampered) {
-        return res.status(404).json({ error: `Sequence ${sequence} not found` });
+        return res
+          .status(404)
+          .json({ error: `Sequence ${sequence} not found` });
       }
 
       fs.writeFileSync(config.auditPath, modifiedLines.join('\n') + '\n');

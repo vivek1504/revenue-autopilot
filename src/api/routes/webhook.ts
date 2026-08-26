@@ -53,28 +53,41 @@ export function createWebhookRouter(
 
   router.post('/razorpay', async (req: Request, res: Response): Promise<any> => {
     const signature = req.headers['x-razorpay-signature'] as string;
-    const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    const rawPayload =
+      (req as any).rawBody ||
+      (typeof req.body === 'string' ? req.body : JSON.stringify(req.body));
 
-    if (!signature || !client.verifyWebhookSignature(rawBody, signature)) {
+    if (!signature || !client.verifyWebhookSignature(rawPayload, signature)) {
       console.warn('⚠️ [Webhook] Invalid or missing Razorpay HMAC signature');
-      return res.status(400).json({ status: 'error', message: 'Invalid signature' });
+      return res
+        .status(400)
+        .json({ status: 'error', message: 'Invalid signature' });
     }
 
-    const payload = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const payload =
+      typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     const event = payload.event;
     console.log(`✅ [Webhook] Received verified Razorpay event: ${event}`);
 
     if (event === 'payment_link.paid' || event === 'payment.captured') {
-      const paymentEntity = payload.payload?.payment_link?.entity || payload.payload?.payment?.entity;
-      const paymentLinkId = paymentEntity?.id || paymentEntity?.payment_link_id;
+      const paymentEntity =
+        payload.payload?.payment_link?.entity ||
+        payload.payload?.payment?.entity;
+      const paymentLinkId =
+        paymentEntity?.id || paymentEntity?.payment_link_id;
       const notes = paymentEntity?.notes || {};
       const customerId = notes.customer_id;
 
       if (paymentLinkId || customerId) {
         // Update database offer status to 'redeemed'
         const whereConditions: any[] = [];
-        if (paymentLinkId) whereConditions.push({ razorpay_payment_link_id: paymentLinkId });
-        if (customerId) whereConditions.push({ customer_id: customerId, status: { in: ['sent', 'pending'] } });
+        if (paymentLinkId)
+          whereConditions.push({ razorpay_payment_link_id: paymentLinkId });
+        if (customerId)
+          whereConditions.push({
+            customer_id: customerId,
+            status: { in: ['sent', 'pending'] },
+          });
 
         if (whereConditions.length > 0) {
           await prisma.recoveryOffer.updateMany({

@@ -100,9 +100,9 @@ export const Stage4Gateway: React.FC<Stage4GatewayProps> = ({
             </thead>
             <tbody className="divide-y divide-slate-100 font-sans">
               {approvedItems.map((item, idx) => {
-                const plinkId = item.execution?.razorpay_payment_link_id || `plink_live_${item.proposal.customer_id}_${idx + 101}`;
-                const shortUrl = item.execution?.razorpay_short_url || `https://rzp.io/l/${plinkId}`;
-                const isCopied = copiedId === plinkId;
+                const plinkId = item.execution?.razorpay_payment_link_id || 'Pending Link';
+                const shortUrl = item.execution?.razorpay_short_url;
+                const isCopied = shortUrl && copiedId === plinkId;
                 const discountedPaise = Math.round(
                   item.proposal.amount_paise * (1 - item.proposal.discount_percent / 100)
                 );
@@ -130,17 +130,21 @@ export const Stage4Gateway: React.FC<Stage4GatewayProps> = ({
                       {formatRupeesExact(discountedPaise)}
                     </td>
                     <td className="py-3.5 px-6 font-mono text-slate-500 text-[10px] max-w-[140px] truncate">
-                      {item.execution?.idempotency_key || `idemp_sha256_${item.proposal.customer_id}`}
+                      {item.execution?.idempotency_key || '—'}
                     </td>
                     <td className="py-3.5 px-6 text-right">
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard(shortUrl, plinkId)}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold text-[11px] transition-colors cursor-pointer border border-slate-200"
-                      >
-                        {isCopied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                        <span>{isCopied ? 'Copied' : 'Copy URL'}</span>
-                      </button>
+                      {shortUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(shortUrl, plinkId)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold text-[11px] transition-colors cursor-pointer border border-slate-200"
+                        >
+                          {isCopied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                          <span>{isCopied ? 'Copied' : 'Copy URL'}</span>
+                        </button>
+                      ) : (
+                        <span className="text-slate-400 font-mono text-[11px]">—</span>
+                      )}
                     </td>
                   </tr>
                 );

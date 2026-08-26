@@ -4,14 +4,24 @@ import { runAutopilot } from '../../index';
 import { config } from '../../shared/config';
 import { AutopilotEvent } from '../../shared/types';
 
+let isAutopilotRunning = false;
+
 export function createAutopilotRouter(): Router {
   const router = Router();
 
-  router.post('/run', async (req: Request, res: Response) => {
+  router.post('/run', async (req: Request, res: Response): Promise<any> => {
+    if (isAutopilotRunning) {
+      return res.status(409).json({
+        status: 'busy',
+        message: 'An Autopilot run is already actively executing',
+      });
+    }
+
     console.log('autopilot triggered');
     const mode = req.body.mode || config.execution.defaultMode;
     const limit = req.body.limit ? parseInt(req.body.limit, 10) : undefined;
 
+    isAutopilotRunning = true;
     res.json({ status: 'started', mode });
 
     runAutopilot({
@@ -20,9 +30,13 @@ export function createAutopilotRouter(): Router {
       onProgress: (event: AutopilotEvent) => {
         autopilotEmitter.emit('event', event);
       },
-    }).catch((err) => {
-      console.error('Error during API triggered autopilot run:', err);
-    });
+    })
+      .catch((err) => {
+        console.error('Error during API triggered autopilot run:', err);
+      })
+      .finally(() => {
+        isAutopilotRunning = false;
+      });
   });
 
   router.get('/events', (req: Request, res: Response) => {
