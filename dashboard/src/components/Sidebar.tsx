@@ -42,11 +42,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const mainNavItems = [
     { id: 'dashboard' as NavTab, label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'pipelines' as NavTab, label: 'Pipelines', icon: GitFork },
+    { id: 'audit' as NavTab, label: 'Audit Log & Ledger', icon: History },
     { id: 'recoveries' as NavTab, label: 'Recoveries & Analytics', icon: CreditCard },
     { id: 'telemetry' as NavTab, label: 'Agent Telemetry', icon: Bot },
-    { id: 'pipelines' as NavTab, label: 'Pipelines', icon: GitFork },
-    { id: 'audit' as NavTab, label: 'Audit Log', icon: History },
-    { id: 'settings' as NavTab, label: 'Settings', icon: Settings },
+    { id: 'settings' as NavTab, label: 'Settings & Policy', icon: Settings },
   ];
 
   const isRunning = status === 'running';

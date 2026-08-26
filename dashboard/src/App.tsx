@@ -70,6 +70,7 @@ export function App() {
                 items={processedActions}
                 events={events}
                 status={status}
+                verificationResult={verificationResult}
                 onSelectVerdict={(item) => setSelectedVerdictItem(item)}
                 onNavigateToTab={(tab) => setCurrentTab(tab)}
               />
@@ -93,6 +94,7 @@ export function App() {
                 items={processedActions}
                 events={events}
                 status={status}
+                verificationResult={verificationResult}
                 onSelectVerdict={(item) => setSelectedVerdictItem(item)}
               />
             )}

@@ -7,16 +7,18 @@ export interface DashboardSummary {
   blocked_count: number;
   unsafe_value_blocked_paise: number;
   approved_value_paise: number;
+  recovered_value_paise: number;
+  recovery_conversion_pct: number;
   avg_recovery_value_paise: number;
   recovery_rate_pct: number;
   live_links_created: number;
   redeemed_count: number;
-  deltas: {
-    recoverable_delta_pct: number;
-    recovered_delta_pct: number;
-    rate_delta_pct: number;
-    protected_delta_pct: number;
-    aov_delta_pct: number;
+  deltas?: {
+    recoverable_delta_pct?: number | null;
+    recovered_delta_pct?: number | null;
+    rate_delta_pct?: number | null;
+    protected_delta_pct?: number | null;
+    aov_delta_pct?: number | null;
   };
 }
 

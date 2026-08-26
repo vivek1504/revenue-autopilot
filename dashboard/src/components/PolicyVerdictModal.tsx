@@ -34,23 +34,21 @@ export const PolicyVerdictModal: React.FC<PolicyVerdictModalProps> = ({ item, on
         {/* Modal Header */}
         <div className="flex items-start gap-3">
           <div
-            className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white ${
-              isApproved ? 'bg-emerald-600' : 'bg-rose-600'
-            }`}
+            className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white ${isApproved ? 'bg-emerald-600' : 'bg-rose-600'
+              }`}
           >
             {isApproved ? <ShieldCheck className="w-6 h-6" /> : <ShieldAlert className="w-6 h-6" />}
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-bold text-slate-950 font-sans">
-                Deterministic Policy Verdict: {item.verdict.verdict}
+                Policy Verdict
               </h3>
               <span
-                className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                  isApproved ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                }`}
+                className={`text-[14px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded ${isApproved ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                  }`}
               >
-                {isApproved ? 'Authorized' : 'Blocked by Guard'}
+                {isApproved ? 'Approved' : 'Blocked'}
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">

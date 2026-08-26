@@ -13,6 +13,7 @@ describe('PolicyEngine Deterministic Rules', () => {
     // Clean up test data
     await prisma.recoveryOffer.deleteMany({ where: { customer_id: { in: ['cust_001', 'cust_999'] } } });
     await prisma.cart.deleteMany({ where: { customer_id: { in: ['cust_001', 'cust_999'] } } });
+    await prisma.order.deleteMany({ where: { customer_id: { in: ['cust_001', 'cust_999'] } } });
     await prisma.customer.deleteMany({ where: { id: { in: ['cust_001', 'cust_999'] } } });
 
     // Seed test customer

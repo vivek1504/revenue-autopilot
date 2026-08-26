@@ -186,7 +186,8 @@ export function useAutopilot() {
     fetchBenchmarks();
     fetchSettings();
     fetchAuditLogs();
-  }, [fetchOpportunitiesQueue, fetchSummary, fetchTimeseries, fetchCohorts, fetchBenchmarks, fetchSettings, fetchAuditLogs]);
+    runVerification();
+  }, [fetchOpportunitiesQueue, fetchSummary, fetchTimeseries, fetchCohorts, fetchBenchmarks, fetchSettings, fetchAuditLogs, runVerification]);
 
   const run = useCallback(async (mode: 'simulated' | 'live' = 'simulated') => {
     setStatus('running');

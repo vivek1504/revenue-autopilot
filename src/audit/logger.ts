@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { AgentProposal, AuditRecord, ExecutionResult, PolicyResult } from '../shared/types';
+import { AgentProposal, AuditRecord, ExecutionResult, LLMReasoningMetadata, PolicyResult } from '../shared/types';
 
 export const GENESIS_HASH = '0'.repeat(64);
 
@@ -26,7 +26,8 @@ export class AuditLogger {
   public append(
     proposal: AgentProposal,
     policyResult: PolicyResult,
-    executionResult?: ExecutionResult
+    executionResult?: ExecutionResult,
+    llmReasoning?: LLMReasoningMetadata
   ): AuditRecord {
     const recordWithoutHash: Omit<AuditRecord, 'record_hash'> = {
       sequence: this.sequence + 1,
@@ -34,6 +35,7 @@ export class AuditLogger {
       proposal,
       policy_result: policyResult,
       execution_result: executionResult,
+      llm_reasoning: llmReasoning,
       previous_hash: this.lastHash,
     };
 

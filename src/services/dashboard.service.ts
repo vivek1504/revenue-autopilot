@@ -30,13 +30,21 @@ export class DashboardService {
       (r) => r.execution?.mode === 'live'
     ).length;
 
-    const redeemedOffers = await this.prisma.recoveryOffer.count({
+    const redeemedOffers = await this.prisma.recoveryOffer.findMany({
       where: { status: 'redeemed' },
+      select: { amount_paise: true, discount_percent: true },
     });
+
+    const redeemedCount = redeemedOffers.length;
+    const recoveredValuePaise = redeemedOffers.reduce((sum, o) => {
+      const discounted = Math.round(o.amount_paise * (1 - (o.discount_percent || 0) / 100));
+      return sum + discounted;
+    }, 0);
 
     const oppsCount = items.length;
     const approvedCount = approvedRecords.length;
     const recoveryRatePct = oppsCount > 0 ? Math.round((approvedCount / oppsCount) * 1000) / 10 : 0;
+    const recoveryConversionPct = approvedCount > 0 ? Math.round((redeemedCount / approvedCount) * 1000) / 10 : 0;
     const avgRecoveryValuePaise = approvedCount > 0 ? Math.round(approvedValuePaise / approvedCount) : 0;
 
     return {
@@ -46,16 +54,18 @@ export class DashboardService {
       blocked_count: blockedRecords.length,
       unsafe_value_blocked_paise: unsafeValueBlockedPaise,
       approved_value_paise: approvedValuePaise,
+      recovered_value_paise: recoveredValuePaise,
+      recovery_conversion_pct: recoveryConversionPct,
       avg_recovery_value_paise: avgRecoveryValuePaise,
       recovery_rate_pct: recoveryRatePct,
       live_links_created: liveLinksCreated,
-      redeemed_count: redeemedOffers,
+      redeemed_count: redeemedCount,
       deltas: {
-        recoverable_delta_pct: 12.4,
-        recovered_delta_pct: 8.4,
-        rate_delta_pct: 2.1,
-        protected_delta_pct: 15.0,
-        aov_delta_pct: 4.8,
+        recoverable_delta_pct: null,
+        recovered_delta_pct: null,
+        rate_delta_pct: null,
+        protected_delta_pct: null,
+        aov_delta_pct: null,
       },
     };
   }

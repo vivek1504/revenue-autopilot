@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { AutopilotEvent, DashboardSummary, ProcessedAction, TelemetryBenchmarks } from '../types';
+import { AutopilotEvent, AuditVerificationResult, DashboardSummary, ProcessedAction, TelemetryBenchmarks } from '../types';
 
 interface AgentTelemetryViewProps {
   summary: DashboardSummary | null;
@@ -21,6 +21,7 @@ interface AgentTelemetryViewProps {
   items: ProcessedAction[];
   events: AutopilotEvent[];
   status: 'idle' | 'running' | 'complete';
+  verificationResult?: AuditVerificationResult | null;
   onSelectVerdict: (item: ProcessedAction) => void;
 }
 
@@ -30,6 +31,7 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
   items,
   events,
   status,
+  verificationResult,
   onSelectVerdict,
 }) => {
   // 1. Live Decision Confidence
@@ -39,12 +41,14 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
   const avgConfidence =
     confidences.length > 0
       ? Math.round((confidences.reduce((a, b) => a + b, 0) / confidences.length) * 1000) / 10
-      : (benchmarks?.avg_confidence ?? 91.5);
+      : (benchmarks?.avg_confidence || 0);
 
   // 2. Real Rule Catches Computed directly from live items
   let discountCatches = 0;
   let expiryCatches = 0;
   let adversarialCatches = 0;
+  let frequencyCatches = 0;
+  let escalationCatches = 0;
 
   for (const item of items) {
     if (item.verdict.verdict === 'BLOCKED') {
@@ -56,6 +60,10 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
           discountCatches++;
         } else if (ruleLower.includes('expiry') || msgLower.includes('expiry') || ruleLower.includes('duration')) {
           expiryCatches++;
+        } else if (ruleLower.includes('frequency') || msgLower.includes('contact')) {
+          frequencyCatches++;
+        } else if (ruleLower.includes('escalation') || msgLower.includes('human')) {
+          escalationCatches++;
         } else {
           adversarialCatches++;
         }
@@ -63,7 +71,7 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
     }
   }
 
-  const totalCatches = discountCatches + expiryCatches + adversarialCatches;
+  const totalCatches = discountCatches + expiryCatches + adversarialCatches + frequencyCatches + escalationCatches;
 
   const ruleCatches = [
     {
@@ -73,10 +81,22 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
       color: 'bg-rose-500',
     },
     {
+      rule: 'Contact Frequency Stopping Rule (3/7d)',
+      count: frequencyCatches,
+      percentage: totalCatches > 0 ? Math.round((frequencyCatches / totalCatches) * 100) : 0,
+      color: 'bg-indigo-600',
+    },
+    {
       rule: 'Link Expiry Over Limit (>72h)',
       count: expiryCatches,
       percentage: totalCatches > 0 ? Math.round((expiryCatches / totalCatches) * 100) : 0,
       color: 'bg-amber-500',
+    },
+    {
+      rule: 'Human Escalation Threshold (>₹25k)',
+      count: escalationCatches,
+      percentage: totalCatches > 0 ? Math.round((escalationCatches / totalCatches) * 100) : 0,
+      color: 'bg-blue-600',
     },
     {
       rule: 'Adversarial Prompt Injection Note',
@@ -89,8 +109,8 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
   // Computed Card Metrics
   const totalProposals = items.length || (benchmarks?.total_proposals_count ?? 0);
   const blockedProposals = items.filter(r => r.verdict.verdict === 'BLOCKED').length || (benchmarks?.blocked_proposals_count ?? 0);
-  const blockRate = totalProposals > 0 ? Math.round((blockedProposals / totalProposals) * 100) : (benchmarks?.block_rate_pct ?? 23);
-  const avgLlmLatency = benchmarks?.avg_llm_latency_ms ?? benchmarks?.p99_llm_ms ?? 140;
+  const blockRate = totalProposals > 0 ? Math.round((blockedProposals / totalProposals) * 100) : (benchmarks?.block_rate_pct ?? 0);
+  const avgLlmLatency = benchmarks?.avg_llm_latency_ms ?? benchmarks?.p99_llm_ms ?? 0;
   const llmCallCount = totalProposals || (benchmarks?.llm_call_count ?? 0);
   const auditRecordsCount = items.length || benchmarks?.verified_audit_records_count || 0;
   const hashChainIntact = benchmarks?.hash_chain_intact ?? true;
@@ -167,18 +187,31 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
         </div>
 
         {/* 4. Audit Records Verified */}
-        <div className="bg-white border border-slate-200/90 rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32">
+        <div className={`bg-white border rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32 ${
+          verificationResult && !verificationResult.valid
+            ? 'border-rose-300 bg-rose-50/30'
+            : 'border-slate-200/90'
+        }`}>
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
             Audit Records Verified
           </span>
           <div className="flex items-end justify-between">
-            <span className="text-3xl font-bold font-tabular text-slate-950">
-              {auditRecordsCount}
+            <span className={`text-3xl font-bold font-tabular ${
+              verificationResult && !verificationResult.valid ? 'text-rose-700' : 'text-slate-950'
+            }`}>
+              {verificationResult ? verificationResult.verified_records : auditRecordsCount}
             </span>
-            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 mb-1 flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              {hashChainIntact ? 'Hash-chain intact' : 'Verification pending'}
-            </span>
+            {verificationResult && !verificationResult.valid ? (
+              <span className="text-xs font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 mb-1 flex items-center gap-1">
+                <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
+                Tamper Detected
+              </span>
+            ) : (
+              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 mb-1 flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                Hash-chain intact
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -227,11 +260,6 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
               </div>
             </div>
           </div>
-
-          <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>Deterministic Guarantee:</span>
-            <span className="font-bold text-emerald-700">100% Policy Pass/Block Fidelity</span>
-          </div>
         </div>
 
         {/* Safety Catch Interception Breakdown */}
@@ -265,11 +293,6 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>False Positive Rate:</span>
-            <strong className="text-emerald-700 font-bold">0.0% (Deterministic Schema)</strong>
           </div>
         </div>
       </div>

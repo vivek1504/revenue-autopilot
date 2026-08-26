@@ -191,4 +191,48 @@ export const RULES: Record<string, RuleCheck> = {
     }
     return null;
   },
+
+  contact_frequency: async ({ proposal, prisma, policy }) => {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentOffersCount = await prisma.recoveryOffer.count({
+      where: {
+        customer_id: proposal.customer_id,
+        created_at: { gte: sevenDaysAgo },
+      },
+    });
+
+    if (recentOffersCount >= policy.maxContactsPerCustomer7Days) {
+      return {
+        rule: 'contact_frequency',
+        message: `Customer reached max contact limit (${recentOffersCount}/${policy.maxContactsPerCustomer7Days} in 7 days). Escalation stopping rule triggered.`,
+        expected: `< ${policy.maxContactsPerCustomer7Days} offers in 7d`,
+        actual: `${recentOffersCount} offers`,
+      };
+    }
+    return null;
+  },
+
+  human_escalation: ({ proposal, policy }) => {
+    if (proposal.amount_paise > policy.humanEscalationThresholdPaise) {
+      return {
+        rule: 'human_escalation',
+        message: `Proposed amount ${formatPaise(proposal.amount_paise)} exceeds human escalation threshold of ${formatPaise(policy.humanEscalationThresholdPaise)}. Requires manual manager approval.`,
+        expected: `<= ${formatPaise(policy.humanEscalationThresholdPaise)}`,
+        actual: proposal.amount_paise,
+      };
+    }
+    return null;
+  },
+
+  confidence_threshold: ({ proposal, policy }) => {
+    if (proposal.confidence_score !== undefined && proposal.confidence_score < policy.minConfidenceScore) {
+      return {
+        rule: 'confidence_threshold',
+        message: `Agent confidence score ${(proposal.confidence_score * 100).toFixed(1)}% is below minimum safety threshold of ${(policy.minConfidenceScore * 100).toFixed(1)}%`,
+        expected: `>= ${(policy.minConfidenceScore * 100).toFixed(1)}%`,
+        actual: `${(proposal.confidence_score * 100).toFixed(1)}%`,
+      };
+    }
+    return null;
+  },
 };
