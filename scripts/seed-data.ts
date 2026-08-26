@@ -1,104 +1,86 @@
-import { initializeDatabase } from '../src/data/schema';
+import { prisma } from '../src/api/dependencies';
 import { generateCustomers } from '../src/data/customers';
 import { generateOrdersAndCarts } from '../src/data/orders';
 import { PRODUCT_CATALOG } from '../src/data/products';
 
 async function seed() {
-  console.log('🌱 Seeding synthetic merchant dataset...\n');
+  console.log('🌱 Seeding synthetic merchant dataset into PostgreSQL via Prisma...\n');
 
-  const db = initializeDatabase();
-
-  db.exec('DELETE FROM recovery_offers');
-  db.exec('DELETE FROM carts');
-  db.exec('DELETE FROM orders');
-  db.exec('DELETE FROM customers');
-  db.exec('DELETE FROM products');
+  await prisma.recoveryOffer.deleteMany({});
+  await prisma.cart.deleteMany({});
+  await prisma.order.deleteMany({});
+  await prisma.customer.deleteMany({});
+  await prisma.product.deleteMany({});
 
   console.log('📦 Inserting product catalog...');
-  const insertProduct = db.prepare(
-    'INSERT INTO products (id, name, category, price_paise, description) VALUES (?, ?, ?, ?, ?)'
-  );
-  for (const p of PRODUCT_CATALOG) {
-    insertProduct.run(p.id, p.name, p.category, p.price_paise, p.description);
-  }
+  await prisma.product.createMany({
+    data: PRODUCT_CATALOG.map((p) => ({
+      id: p.id,
+      name: p.name,
+      category: p.category,
+      price_paise: p.price_paise,
+      description: p.description,
+    })),
+  });
   console.log(`   ✓ ${PRODUCT_CATALOG.length} products inserted.`);
 
   console.log('\n👥 Generating synthetic customers...');
   const customers = generateCustomers(120);
-  const insertCustomer = db.prepare(`
-    INSERT INTO customers (
-      id, name, email, phone, tier, lifetime_spend_paise,
-      total_orders, first_purchase_date, last_purchase_date, notes, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  for (const c of customers) {
-    insertCustomer.run(
-      c.id,
-      c.name,
-      c.email,
-      c.phone || null,
-      c.tier,
-      c.lifetime_spend_paise,
-      c.total_orders,
-      c.first_purchase_date || null,
-      c.last_purchase_date || null,
-      c.notes || null,
-      c.created_at
-    );
-  }
+  await prisma.customer.createMany({
+    data: customers.map((c) => ({
+      id: c.id,
+      name: c.name,
+      email: c.email,
+      phone: c.phone || null,
+      tier: c.tier,
+      lifetime_spend_paise: c.lifetime_spend_paise,
+      total_orders: c.total_orders,
+      first_purchase_date: c.first_purchase_date ? new Date(c.first_purchase_date) : null,
+      last_purchase_date: c.last_purchase_date ? new Date(c.last_purchase_date) : null,
+      notes: c.notes || null,
+      created_at: new Date(c.created_at),
+    })),
+  });
   console.log(`   ✓ ${customers.length} customers inserted.`);
 
   console.log('\n🛒 Generating orders and active carts...');
   const { orders, carts } = generateOrdersAndCarts(customers, PRODUCT_CATALOG);
 
-  const insertOrder = db.prepare(`
-    INSERT INTO orders (
-      id, customer_id, status, total_paise, created_at, completed_at, failure_reason, items
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  for (const o of orders) {
-    insertOrder.run(
-      o.id,
-      o.customer_id,
-      o.status,
-      o.total_paise,
-      o.created_at,
-      o.completed_at || null,
-      o.failure_reason || null,
-      JSON.stringify(o.items)
-    );
-  }
+  await prisma.order.createMany({
+    data: orders.map((o) => ({
+      id: o.id,
+      customer_id: o.customer_id,
+      status: o.status,
+      total_paise: o.total_paise,
+      created_at: new Date(o.created_at),
+      completed_at: o.completed_at ? new Date(o.completed_at) : null,
+      failure_reason: o.failure_reason || null,
+      items: o.items as any,
+    })),
+  });
   console.log(`   ✓ ${orders.length} orders inserted.`);
 
-  const insertCart = db.prepare(`
-    INSERT INTO carts (
-      id, customer_id, items, total_paise, created_at, last_activity, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  for (const cart of carts) {
-    insertCart.run(
-      cart.id,
-      cart.customer_id,
-      JSON.stringify(cart.items),
-      cart.total_paise,
-      cart.created_at,
-      cart.last_activity,
-      cart.status
-    );
-  }
+  await prisma.cart.createMany({
+    data: carts.map((cart) => ({
+      id: cart.id,
+      customer_id: cart.customer_id,
+      items: cart.items as any,
+      total_paise: cart.total_paise,
+      created_at: new Date(cart.created_at),
+      last_activity: new Date(cart.last_activity),
+      status: cart.status,
+    })),
+  });
   console.log(`   ✓ ${carts.length} active/abandoned carts inserted.`);
 
   const stats = {
-    customers: (db.prepare('SELECT COUNT(*) as c FROM customers').get() as any).c,
-    orders: (db.prepare('SELECT COUNT(*) as c FROM orders').get() as any).c,
-    completedOrders: (db.prepare("SELECT COUNT(*) as c FROM orders WHERE status='completed'").get() as any).c,
-    failedOrders: (db.prepare("SELECT COUNT(*) as c FROM orders WHERE status='failed'").get() as any).c,
-    abandonedCarts: (db.prepare("SELECT COUNT(*) as c FROM carts WHERE status='abandoned'").get() as any).c,
-    adversarialNotes: (db.prepare("SELECT COUNT(*) as c FROM customers WHERE notes IS NOT NULL").get() as any).c,
-    vipCustomers: (db.prepare("SELECT COUNT(*) as c FROM customers WHERE tier='vip'").get() as any).c,
+    customers: await prisma.customer.count(),
+    orders: await prisma.order.count(),
+    completedOrders: await prisma.order.count({ where: { status: 'completed' } }),
+    failedOrders: await prisma.order.count({ where: { status: 'failed' } }),
+    abandonedCarts: await prisma.cart.count({ where: { status: 'abandoned' } }),
+    adversarialNotes: await prisma.customer.count({ where: { notes: { not: null } } }),
+    vipCustomers: await prisma.customer.count({ where: { tier: 'vip' } }),
   };
 
   console.log('\n========================================');
@@ -111,8 +93,8 @@ async function seed() {
   console.log(` Adversarial Notes:     ${stats.adversarialNotes}`);
   console.log('========================================\n');
 
-  db.close();
-  console.log('✅ Database seeded successfully at data/merchant.db!');
+  await prisma.$disconnect();
+  console.log('✅ Database seeded successfully!');
 }
 
 seed().catch(console.error);
