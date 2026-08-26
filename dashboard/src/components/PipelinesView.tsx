@@ -40,6 +40,7 @@ export const PipelinesView: React.FC<PipelinesViewProps> = ({
   const approvedOpps = approvedItems.length;
   const blockedOpps = blockedItems.length;
   const redeemedOpps = summary?.redeemed_count || 0;
+  const recoveredValuePaise = summary?.recovered_value_paise || 0;
 
   const totalVolumePaise = items.reduce((sum, i) => sum + (i.proposal.amount_paise || 0), 0);
   const approvedVolumePaise = approvedItems.reduce((sum, i) => {
@@ -54,7 +55,7 @@ export const PipelinesView: React.FC<PipelinesViewProps> = ({
     {
       id: 1,
       title: 'Identified',
-      subtitle: 'SQLite Discovery',
+      subtitle: 'Postgres Discovery',
       icon: Database,
       count: `${totalOpps} Opps`,
       volume: formatRupees(totalVolumePaise),
@@ -101,7 +102,7 @@ export const PipelinesView: React.FC<PipelinesViewProps> = ({
       subtitle: 'Webhook Verified',
       icon: CheckCheck,
       count: `${redeemedOpps} Redeemed`,
-      volume: formatRupees(redeemedOpps * 249900),
+      volume: formatRupees(recoveredValuePaise),
       latency: 'Real-Time',
       badge: 'HMAC SHA-256',
       badgeColor: 'bg-emerald-100 text-emerald-900 border border-emerald-300',
@@ -179,6 +180,7 @@ export const PipelinesView: React.FC<PipelinesViewProps> = ({
         <Stage5Settlement
           approvedItems={approvedItems}
           redeemedOpps={redeemedOpps}
+          recoveredValuePaise={recoveredValuePaise}
           formatRupees={formatRupees}
           formatRupeesExact={formatRupeesExact}
         />
