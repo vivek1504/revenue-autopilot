@@ -4,3 +4,5 @@ db
 dist
 *.db*
 scripts/test-razorpay.ts
+
+/generated/prisma

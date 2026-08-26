@@ -20,6 +20,6 @@ export const config = {
     maxLiveLinks: 10,
     defaultMode: (process.env.EXECUTION_MODE || 'simulated') as 'live' | 'simulated',
   },
-  dbPath: path.join(process.cwd(), 'data', 'merchant.db'),
+  databaseUrl: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/revenue_autopilot?schema=public',
   auditPath: path.join(process.cwd(), 'data', 'audit.jsonl'),
 };

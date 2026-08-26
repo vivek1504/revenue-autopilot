@@ -6,9 +6,9 @@ export function createTelemetryRouter(): Router {
   const router = Router();
   const telemetryService = new TelemetryService();
 
-  router.get('/benchmarks', (req: Request, res: Response) => {
+  router.get('/benchmarks', async (req: Request, res: Response) => {
     try {
-      const items = getAllCurrentActions();
+      const items = await getAllCurrentActions();
       const auditRecords = getAuditRecords();
       const benchmarks = telemetryService.getBenchmarks(items, auditRecords);
       res.json(benchmarks);

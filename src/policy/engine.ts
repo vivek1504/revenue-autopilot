@@ -1,29 +1,29 @@
-import Database from 'better-sqlite3';
+import { PrismaClient } from '@prisma/client';
 import { AgentProposal, PolicyResult, PolicyViolation } from '../shared/types';
 import { DEFAULT_MERCHANT_POLICY, MerchantPolicy } from './config';
 import { RULES, RuleContext } from './rules';
 
 export class PolicyEngine {
   private policy: MerchantPolicy;
-  private db: Database.Database;
+  private prisma: PrismaClient;
 
-  constructor(policy: MerchantPolicy = DEFAULT_MERCHANT_POLICY, db: Database.Database) {
+  constructor(policy: MerchantPolicy = DEFAULT_MERCHANT_POLICY, prisma: PrismaClient) {
     this.policy = policy;
-    this.db = db;
+    this.prisma = prisma;
   }
 
-  public evaluate(proposal: AgentProposal): PolicyResult {
+  public async evaluate(proposal: AgentProposal): Promise<PolicyResult> {
     const violations: PolicyViolation[] = [];
     const ctx: RuleContext = {
       proposal,
       policy: this.policy,
-      db: this.db,
+      prisma: this.prisma,
     };
 
     // Run ALL rule checks and collect ALL violations (never short-circuit!)
     for (const [ruleName, checkFn] of Object.entries(RULES)) {
       try {
-        const violation = checkFn(ctx);
+        const violation = await checkFn(ctx);
         if (violation) {
           violations.push(violation);
         }

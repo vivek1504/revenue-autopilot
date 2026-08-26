@@ -1,4 +1,4 @@
-import { initializeDatabase } from '../data/schema';
+import { prisma as globalPrisma } from '../api/dependencies';
 import { detectOpportunities } from '../agent/detector';
 import { RevenueAgent } from '../agent/revenue-agent';
 import { PolicyEngine } from '../policy/engine';
@@ -19,7 +19,6 @@ import { liveTelemetryStats } from './telemetry';
 export interface RunAutopilotOptions {
   mode?: 'live' | 'simulated';
   onProgress?: (event: AutopilotEvent) => void;
-  customDbPath?: string;
   customAuditPath?: string;
   limit?: number;
 }
@@ -29,9 +28,9 @@ export async function runAutopilot(
 ): Promise<AutopilotResult> {
   const startTime = Date.now();
   const mode = options.mode || config.execution.defaultMode;
-  const db = initializeDatabase(options.customDbPath);
+  const prismaClient = globalPrisma;
   const agent = new RevenueAgent(config.gemini.apiKey);
-  const policyEngine = new PolicyEngine(DEFAULT_MERCHANT_POLICY, db);
+  const policyEngine = new PolicyEngine(DEFAULT_MERCHANT_POLICY, prismaClient);
   const rzpClient = new RazorpayClient(
     config.razorpay.keyId,
     config.razorpay.keySecret,
@@ -48,7 +47,7 @@ export async function runAutopilot(
 
   // 1. Detect opportunities (Measure discovery latency)
   const t0 = performance.now();
-  let opportunities = detectOpportunities(db);
+  let opportunities = await detectOpportunities(prismaClient);
   const discoveryMs = performance.now() - t0;
   liveTelemetryStats.p99_discovery_ms = Math.round(discoveryMs * 10) / 10 || 1.2;
 
@@ -87,7 +86,7 @@ export async function runAutopilot(
 
       // Step 3: Policy Engine evaluates proposal (Measure policy latency)
       const tPol0 = performance.now();
-      const verdict = policyEngine.evaluate(proposal);
+      const verdict = await policyEngine.evaluate(proposal);
       const polDuration = performance.now() - tPol0;
       policyLatencies.push(polDuration);
       options.onProgress?.({ type: 'verdict', verdict });
@@ -104,21 +103,23 @@ export async function runAutopilot(
         execution = await gateway.execute(verdict, mode);
         options.onProgress?.({ type: 'execution', execution });
 
-        // Save recovery offer record to DB
-        const offerStmt = db.prepare(`
-          INSERT INTO recovery_offers (id, customer_id, action_type, amount_paise, discount_percent, status, created_at, expires_at, razorpay_payment_link_id, razorpay_order_id)
-          VALUES (?, ?, ?, ?, ?, 'sent', datetime('now'), datetime('now', '+' || ? || ' hours'), ?, ?)
-        `);
-        offerStmt.run(
-          `off_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-          proposal.customer_id,
-          proposal.action,
-          proposal.amount_paise,
-          proposal.discount_percent,
-          proposal.expiry_hours,
-          execution.razorpay_payment_link_id || null,
-          execution.razorpay_order_id || null
-        );
+        // Save recovery offer record to DB via Prisma
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + proposal.expiry_hours * 60 * 60 * 1000);
+        await prismaClient.recoveryOffer.create({
+          data: {
+            id: `off_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            customer_id: proposal.customer_id,
+            action_type: proposal.action,
+            amount_paise: proposal.amount_paise,
+            discount_percent: proposal.discount_percent,
+            status: 'sent',
+            created_at: now,
+            expires_at: expiresAt,
+            razorpay_payment_link_id: execution.razorpay_payment_link_id || null,
+            razorpay_order_id: execution.razorpay_order_id || null,
+          },
+        });
       } else {
         blockedCount++;
         unsafeValueBlockedPaise += proposal.amount_paise;

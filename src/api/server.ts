@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { config } from '../shared/config';
-import { db, rzpClient, auditLogger, autopilotEmitter } from './dependencies';
+import { prisma, rzpClient, auditLogger, autopilotEmitter } from './dependencies';
 import { createDashboardRouter } from './routes/dashboard';
 import { createOpportunitiesRouter } from './routes/opportunities';
 import { createAnalyticsRouter } from './routes/analytics';
@@ -28,7 +28,7 @@ app.use('/api/settings', createSettingsRouter());
 app.use('/api/export', createExportRouter());
 app.use('/api/autopilot', createAutopilotRouter());
 app.use('/api/audit', createAuditRouter());
-app.use('/api/webhook', createWebhookRouter(db, rzpClient, auditLogger));
+app.use('/api/webhook', createWebhookRouter(prisma, rzpClient, auditLogger));
 
 export function startServer(port: number = config.server.port) {
   return app.listen(port, () => {

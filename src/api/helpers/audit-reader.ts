@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { db } from '../dependencies';
+import { prisma } from '../dependencies';
 import { detectOpportunities } from '../../agent/detector';
 import { RevenueAgent } from '../../agent/revenue-agent';
 import { PolicyEngine } from '../../policy/engine';
@@ -23,31 +23,39 @@ export function getAuditRecords(): AuditRecord[] {
   }
 }
 
-export function getAllCurrentActions(): ProcessedAction[] {
+export async function getAllCurrentActions(): Promise<ProcessedAction[]> {
   const auditRecords = getAuditRecords();
-  const getCustomerName = db.prepare('SELECT name FROM customers WHERE id = ?');
 
   if (auditRecords.length > 0) {
+    const customerIds = Array.from(new Set(auditRecords.map((r) => r.proposal.customer_id)));
+    const customers = await prisma.customer.findMany({
+      where: { id: { in: customerIds } },
+      select: { id: true, name: true },
+    });
+    const customerMap = new Map(customers.map((c) => [c.id, c.name]));
+
     return auditRecords.map((r) => {
-      const cust = getCustomerName.get(r.proposal.customer_id) as any;
+      const custName = customerMap.get(r.proposal.customer_id) || r.proposal.customer_id;
       return {
         proposal: r.proposal,
         verdict: r.policy_result,
         execution: r.execution_result,
         auditRecord: r,
-        customerName: cust?.name || r.proposal.customer_id,
+        customerName: custName,
       };
     });
   }
 
-  // Detect live from SQLite
-  const rawOpps = detectOpportunities(db);
+  // Detect live from Postgres via Prisma
+  const rawOpps = await detectOpportunities(prisma);
   const agent = new RevenueAgent();
-  const policyEngine = new PolicyEngine(DEFAULT_MERCHANT_POLICY, db);
+  const policyEngine = new PolicyEngine(DEFAULT_MERCHANT_POLICY, prisma);
 
-  return rawOpps.map((opp, idx) => {
+  const actions: ProcessedAction[] = [];
+  for (let idx = 0; idx < rawOpps.length; idx++) {
+    const opp = rawOpps[idx];
     const proposal = agent.fallbackProposal(opp);
-    const verdict = policyEngine.evaluate(proposal);
+    const verdict = await policyEngine.evaluate(proposal);
 
     const auditRecord: AuditRecord = {
       sequence: idx + 1,
@@ -58,11 +66,13 @@ export function getAllCurrentActions(): ProcessedAction[] {
       record_hash: 'INITIAL_PENDING_CHAIN',
     };
 
-    return {
+    actions.push({
       proposal,
       verdict,
       auditRecord,
       customerName: opp.customer.name,
-    };
-  });
+    });
+  }
+
+  return actions;
 }

@@ -1,13 +1,11 @@
-import Database from 'better-sqlite3';
+import { PrismaClient } from '@prisma/client';
 import { ProcessedAction, DashboardSummary } from '../shared/types';
 
 export class DashboardService {
-  constructor(private db: Database.Database) {}
+  constructor(private prisma: PrismaClient) {}
 
-  public getSummary(items: ProcessedAction[]): DashboardSummary {
-    const totalCustomers = (
-      this.db.prepare('SELECT COUNT(*) as cnt FROM customers').get() as any
-    )?.cnt || 0;
+  public async getSummary(items: ProcessedAction[]): Promise<DashboardSummary> {
+    const totalCustomers = await this.prisma.customer.count();
 
     const approvedRecords = items.filter(
       (r) => r.verdict.verdict === 'APPROVED'
@@ -32,9 +30,9 @@ export class DashboardService {
       (r) => r.execution?.mode === 'live'
     ).length;
 
-    const redeemedOffers = (
-      this.db.prepare("SELECT COUNT(*) as cnt FROM recovery_offers WHERE status = 'redeemed'").get() as any
-    )?.cnt || 0;
+    const redeemedOffers = await this.prisma.recoveryOffer.count({
+      where: { status: 'redeemed' },
+    });
 
     const oppsCount = items.length;
     const approvedCount = approvedRecords.length;

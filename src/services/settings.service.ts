@@ -1,11 +1,11 @@
-import Database from 'better-sqlite3';
+import { PrismaClient } from '@prisma/client';
 import { SystemSettings } from '../shared/types';
 
 export class SettingsService {
-  constructor(private db: Database.Database) {}
+  constructor(private prisma: PrismaClient) {}
 
-  public getSettings(): SystemSettings {
-    const rows = this.db.prepare('SELECT key, value FROM system_settings').all() as any[];
+  public async getSettings(): Promise<SystemSettings> {
+    const rows = await this.prisma.systemSetting.findMany();
     const settingsMap: Record<string, any> = {};
     for (const r of rows) {
       try {
@@ -24,7 +24,7 @@ export class SettingsService {
     };
   }
 
-  public updateSettings(body: Partial<SystemSettings>): void {
+  public async updateSettings(body: Partial<SystemSettings>): Promise<void> {
     const {
       model,
       autonomy_mode,
@@ -33,16 +33,19 @@ export class SettingsService {
       high_value_threshold_paise,
     } = body;
 
-    const upsert = this.db.prepare(`
-      INSERT INTO system_settings (key, value, updated_at) 
-      VALUES (?, ?, datetime('now'))
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-    `);
+    const upsertKey = async (key: string, val: any) => {
+      const stringValue = JSON.stringify(val);
+      await this.prisma.systemSetting.upsert({
+        where: { key },
+        create: { key, value: stringValue, updated_at: new Date() },
+        update: { value: stringValue, updated_at: new Date() },
+      });
+    };
 
-    if (model) upsert.run('model', JSON.stringify(model));
-    if (autonomy_mode) upsert.run('autonomy_mode', JSON.stringify(autonomy_mode));
-    if (max_discount_percent !== undefined) upsert.run('max_discount_percent', JSON.stringify(max_discount_percent));
-    if (max_expiry_hours !== undefined) upsert.run('max_expiry_hours', JSON.stringify(max_expiry_hours));
-    if (high_value_threshold_paise !== undefined) upsert.run('high_value_threshold_paise', JSON.stringify(high_value_threshold_paise));
+    if (model) await upsertKey('model', model);
+    if (autonomy_mode) await upsertKey('autonomy_mode', autonomy_mode);
+    if (max_discount_percent !== undefined) await upsertKey('max_discount_percent', max_discount_percent);
+    if (max_expiry_hours !== undefined) await upsertKey('max_expiry_hours', max_expiry_hours);
+    if (high_value_threshold_paise !== undefined) await upsertKey('high_value_threshold_paise', high_value_threshold_paise);
   }
 }

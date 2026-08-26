@@ -1,38 +1,49 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import Database from 'better-sqlite3';
-import { initializeDatabase } from '../src/data/schema';
+import { prisma } from '../src/api/dependencies';
 import { PolicyEngine } from '../src/policy/engine';
 import { DEFAULT_MERCHANT_POLICY } from '../src/policy/config';
 import { AgentProposal } from '../src/shared/types';
-import path from 'path';
-import fs from 'fs';
 
 describe('PolicyEngine Deterministic Rules', () => {
-  let db: Database.Database;
   let policyEngine: PolicyEngine;
-  const testDbPath = path.join(process.cwd(), 'data', 'test_policy.db');
 
-  beforeAll(() => {
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
-    db = initializeDatabase(testDbPath);
-    policyEngine = new PolicyEngine(DEFAULT_MERCHANT_POLICY, db);
+  beforeAll(async () => {
+    policyEngine = new PolicyEngine(DEFAULT_MERCHANT_POLICY, prisma);
+
+    // Clean up test data
+    await prisma.recoveryOffer.deleteMany({ where: { customer_id: { in: ['cust_001', 'cust_999'] } } });
+    await prisma.cart.deleteMany({ where: { customer_id: { in: ['cust_001', 'cust_999'] } } });
+    await prisma.customer.deleteMany({ where: { id: { in: ['cust_001', 'cust_999'] } } });
 
     // Seed test customer
-    db.prepare(`
-      INSERT INTO customers (id, name, email, tier, lifetime_spend_paise, total_orders)
-      VALUES ('cust_001', 'Ananya Sharma', 'ananya@example.com', 'standard', 2200000, 3)
-    `).run();
+    await prisma.customer.create({
+      data: {
+        id: 'cust_001',
+        name: 'Ananya Sharma',
+        email: 'ananya@example.com',
+        tier: 'standard',
+        lifetime_spend_paise: 2200000,
+        total_orders: 3,
+        created_at: new Date(),
+      },
+    });
 
     // Seed test cart for cust_001
-    db.prepare(`
-      INSERT INTO carts (id, customer_id, items, total_paise, created_at, last_activity, status)
-      VALUES ('cart_001', 'cust_001', '[]', 850000, datetime('now', '-2 hours'), datetime('now', '-2 hours'), 'abandoned')
-    `).run();
+    const twoHoursAgo = new Date(Date.now() - 2 * 3600 * 1000);
+    await prisma.cart.create({
+      data: {
+        id: 'cart_001',
+        customer_id: 'cust_001',
+        items: [] as any,
+        total_paise: 850000,
+        created_at: twoHoursAgo,
+        last_activity: twoHoursAgo,
+        status: 'abandoned',
+      },
+    });
   });
 
-  it('should APPROVE a valid proposal within merchant policy limits', () => {
+  it('should APPROVE a valid proposal within merchant policy limits', async () => {
     const validProposal: AgentProposal = {
       customer_id: 'cust_001',
       action: 'discounted_payment_link',
@@ -48,12 +59,12 @@ describe('PolicyEngine Deterministic Rules', () => {
       },
     };
 
-    const result = policyEngine.evaluate(validProposal);
+    const result = await policyEngine.evaluate(validProposal);
     expect(result.verdict).toBe('APPROVED');
     expect(result.violations).toHaveLength(0);
   });
 
-  it('should BLOCK proposals exceeding the max automated transaction limit', () => {
+  it('should BLOCK proposals exceeding the max automated transaction limit', async () => {
     const overLimitProposal: AgentProposal = {
       customer_id: 'cust_001',
       action: 'discounted_payment_link',
@@ -68,12 +79,12 @@ describe('PolicyEngine Deterministic Rules', () => {
       },
     };
 
-    const result = policyEngine.evaluate(overLimitProposal);
+    const result = await policyEngine.evaluate(overLimitProposal);
     expect(result.verdict).toBe('BLOCKED');
     expect(result.violations.some((v) => v.rule === 'amount_limit')).toBe(true);
   });
 
-  it('should BLOCK proposals exceeding max discount percentage limit', () => {
+  it('should BLOCK proposals exceeding max discount percentage limit', async () => {
     const excessiveDiscountProposal: AgentProposal = {
       customer_id: 'cust_001',
       action: 'discounted_payment_link',
@@ -88,12 +99,12 @@ describe('PolicyEngine Deterministic Rules', () => {
       },
     };
 
-    const result = policyEngine.evaluate(excessiveDiscountProposal);
+    const result = await policyEngine.evaluate(excessiveDiscountProposal);
     expect(result.verdict).toBe('BLOCKED');
     expect(result.violations.some((v) => v.rule === 'discount_limit')).toBe(true);
   });
 
-  it('should BLOCK proposals referencing non-existent customer_id', () => {
+  it('should BLOCK proposals referencing non-existent customer_id', async () => {
     const ghostCustomerProposal: AgentProposal = {
       customer_id: 'cust_999', // Ghost customer!
       action: 'discounted_payment_link',
@@ -107,17 +118,27 @@ describe('PolicyEngine Deterministic Rules', () => {
       },
     };
 
-    const result = policyEngine.evaluate(ghostCustomerProposal);
+    const result = await policyEngine.evaluate(ghostCustomerProposal);
     expect(result.verdict).toBe('BLOCKED');
     expect(result.violations.some((v) => v.rule === 'customer_exists')).toBe(true);
   });
 
-  it('should BLOCK duplicate active recovery offers for same customer', () => {
+  it('should BLOCK duplicate active recovery offers for same customer', async () => {
     // Insert an active recovery offer for cust_001
-    db.prepare(`
-      INSERT INTO recovery_offers (id, customer_id, action_type, amount_paise, discount_percent, status, created_at, expires_at)
-      VALUES ('offer_001', 'cust_001', 'discounted_payment_link', 850000, 5, 'pending', datetime('now'), datetime('now', '+24 hours'))
-    `).run();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 24 * 3600 * 1000);
+    await prisma.recoveryOffer.create({
+      data: {
+        id: 'offer_001',
+        customer_id: 'cust_001',
+        action_type: 'discounted_payment_link',
+        amount_paise: 850000,
+        discount_percent: 5,
+        status: 'pending',
+        created_at: now,
+        expires_at: expiresAt,
+      },
+    });
 
     const duplicateProposal: AgentProposal = {
       customer_id: 'cust_001',
@@ -133,12 +154,12 @@ describe('PolicyEngine Deterministic Rules', () => {
       },
     };
 
-    const result = policyEngine.evaluate(duplicateProposal);
+    const result = await policyEngine.evaluate(duplicateProposal);
     expect(result.verdict).toBe('BLOCKED');
     expect(result.violations.some((v) => v.rule === 'duplicate_offer')).toBe(true);
   });
 
-  it('should BLOCK proposals with hallucinated evidence numbers', () => {
+  it('should BLOCK proposals with hallucinated evidence numbers', async () => {
     const hallucinatedEvidenceProposal: AgentProposal = {
       customer_id: 'cust_001',
       action: 'discounted_payment_link',
@@ -153,14 +174,14 @@ describe('PolicyEngine Deterministic Rules', () => {
     };
 
     // Remove active offer so duplicate_offer doesn't trigger
-    db.prepare('DELETE FROM recovery_offers').run();
+    await prisma.recoveryOffer.deleteMany({ where: { customer_id: 'cust_001' } });
 
-    const result = policyEngine.evaluate(hallucinatedEvidenceProposal);
+    const result = await policyEngine.evaluate(hallucinatedEvidenceProposal);
     expect(result.verdict).toBe('BLOCKED');
     expect(result.violations.some((v) => v.rule === 'evidence_consistent')).toBe(true);
   });
 
-  it('should BLOCK adversarial injection proposals with multiple violation reasons', () => {
+  it('should BLOCK adversarial injection proposals with multiple violation reasons', async () => {
     const adversarialProposal: AgentProposal = {
       customer_id: 'cust_001',
       action: 'discounted_payment_link',
@@ -174,7 +195,7 @@ describe('PolicyEngine Deterministic Rules', () => {
       },
     };
 
-    const result = policyEngine.evaluate(adversarialProposal);
+    const result = await policyEngine.evaluate(adversarialProposal);
     expect(result.verdict).toBe('BLOCKED');
     expect(result.violations.length).toBeGreaterThanOrEqual(3);
   });
