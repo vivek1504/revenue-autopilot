@@ -6,9 +6,9 @@ export function createAnalyticsRouter(): Router {
   const router = Router();
   const analyticsService = new AnalyticsService();
 
-  router.get('/timeseries', (req: Request, res: Response) => {
+  router.get('/timeseries', async (req: Request, res: Response) => {
     try {
-      const items = getAllCurrentActions();
+      const items = await getAllCurrentActions();
       const timeseries = analyticsService.getTimeseries(items);
       res.json(timeseries);
     } catch (err: any) {
@@ -16,9 +16,9 @@ export function createAnalyticsRouter(): Router {
     }
   });
 
-  router.get('/cohorts', (req: Request, res: Response) => {
+  router.get('/cohorts', async (req: Request, res: Response) => {
     try {
-      const items = getAllCurrentActions();
+      const items = await getAllCurrentActions();
       const cohorts = analyticsService.getCohorts(items);
       res.json(cohorts);
     } catch (err: any) {

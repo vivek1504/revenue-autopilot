@@ -1,11 +1,11 @@
 import { Router, Request, Response } from 'express';
-import Database from 'better-sqlite3';
+import { PrismaClient } from '@prisma/client';
 import { RazorpayClient } from '../../gateway/razorpay-client';
 import { AuditLogger } from '../../audit/logger';
 import { AgentProposal, PolicyResult } from '../../shared/types';
 
 export function createWebhookRouter(
-  db: Database.Database,
+  prisma: PrismaClient,
   client: RazorpayClient,
   auditLogger: AuditLogger
 ): Router {
@@ -51,7 +51,7 @@ export function createWebhookRouter(
     `);
   });
 
-  router.post('/razorpay', (req: Request, res: Response): any => {
+  router.post('/razorpay', async (req: Request, res: Response): Promise<any> => {
     const signature = req.headers['x-razorpay-signature'] as string;
     const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
 
@@ -72,12 +72,16 @@ export function createWebhookRouter(
 
       if (paymentLinkId || customerId) {
         // Update database offer status to 'redeemed'
-        const stmt = db.prepare(`
-          UPDATE recovery_offers 
-          SET status = 'redeemed' 
-          WHERE razorpay_payment_link_id = ? OR (customer_id = ? AND status IN ('sent', 'pending'))
-        `);
-        stmt.run(paymentLinkId, customerId);
+        const whereConditions: any[] = [];
+        if (paymentLinkId) whereConditions.push({ razorpay_payment_link_id: paymentLinkId });
+        if (customerId) whereConditions.push({ customer_id: customerId, status: { in: ['sent', 'pending'] } });
+
+        if (whereConditions.length > 0) {
+          await prisma.recoveryOffer.updateMany({
+            where: { OR: whereConditions },
+            data: { status: 'redeemed' },
+          });
+        }
 
         // Audit record for redeemed offer
         if (customerId) {
