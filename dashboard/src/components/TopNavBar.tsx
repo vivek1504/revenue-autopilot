@@ -29,9 +29,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
       {/* Right: Environment Badge, Icons & User Avatar */}
       <div className="flex items-center gap-4">
         {/* Environment Pill Badge */}
-        <div className="hidden sm:inline-flex items-center px-3 py-1 rounded-full bg-[#dbeafe] text-[#1e40af] text-[11px] font-bold tracking-wider uppercase font-sans">
-          ENVIRONMENT: PRODUCTION
-        </div>
+
 
         {/* Icons */}
         <div className="flex items-center gap-2.5 text-slate-600">

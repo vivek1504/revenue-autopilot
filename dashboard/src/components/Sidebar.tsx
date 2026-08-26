@@ -24,6 +24,8 @@ interface SidebarProps {
   onSelectTab: (tab: NavTab) => void;
   status: 'idle' | 'running' | 'complete';
   onRun: () => void;
+  executionMode: 'live' | 'simulated';
+  onModeChange: (mode: 'live' | 'simulated') => void;
   processedCount?: number;
   totalCount?: number;
   onExport?: () => void;
@@ -34,6 +36,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTab,
   status,
   onRun,
+  executionMode,
+  onModeChange,
   onExport,
 }) => {
   const mainNavItems = [
@@ -60,22 +64,67 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </p>
         </div>
 
-        {/* PRIMARY CTA: Run Recovery Scan Button (Positioned at the Top) */}
+        {/* Mode Selector Toggle */}
+        <div className="px-5 pb-3">
+          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+            <span>Execution Mode</span>
+            {executionMode === 'live' ? (
+              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-bold bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/50">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Razorpay API
+              </span>
+            ) : (
+              <span className="text-[10px] text-slate-400 font-bold bg-slate-800 px-1.5 py-0.5 rounded">
+                Mock
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 p-1 bg-slate-900/90 rounded-lg border border-slate-800 text-xs font-semibold">
+            <button
+              onClick={() => onModeChange('live')}
+              className={cn(
+                "py-1.5 rounded-md transition-all text-center cursor-pointer flex items-center justify-center gap-1",
+                executionMode === 'live'
+                  ? "bg-emerald-600 text-white font-bold shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              )}
+            >
+              <span className="w-2 h-2 rounded-full bg-white"></span>
+              Live Mode
+            </button>
+            <button
+              onClick={() => onModeChange('simulated')}
+              className={cn(
+                "py-1.5 rounded-md transition-all text-center cursor-pointer",
+                executionMode === 'simulated'
+                  ? "bg-slate-700 text-white font-bold shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              )}
+            >
+              Simulated
+            </button>
+          </div>
+        </div>
+
+        {/* PRIMARY CTA: Run Recovery Scan Button */}
         <div className="px-5 pb-5">
           <button
             onClick={() => onRun()}
             disabled={isRunning}
             className={cn(
-              "w-full bg-[#dbeafe] hover:bg-[#bfdbfe] active:bg-[#93c5fd] text-[#0b1c30] font-extrabold text-sm py-3 px-4 rounded-lg shadow-sm transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed font-sans",
-              isRunning && "bg-blue-100"
+              "w-full font-extrabold text-sm py-3 px-4 rounded-lg shadow-sm transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed font-sans",
+              executionMode === 'live'
+                ? "bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-950"
+                : "bg-[#dbeafe] hover:bg-[#bfdbfe] active:bg-[#93c5fd] text-[#0b1c30]",
+              isRunning && "opacity-80 animate-pulse"
             )}
           >
             {isRunning ? (
-              <RefreshCw className="w-4 h-4 text-[#0b1c30] animate-spin" />
+              <RefreshCw className="w-4 h-4 animate-spin" />
             ) : (
-              <Search className="w-4 h-4 text-[#0b1c30] stroke-[2.5]" />
+              <Search className="w-4 h-4 stroke-[2.5]" />
             )}
-            <span>{isRunning ? 'Scanning Database...' : 'Run Recovery Scan'}</span>
+            <span>{isRunning ? 'Scanning Database...' : `Run ${executionMode === 'live' ? 'Live' : 'Simulated'} Scan`}</span>
           </button>
         </div>
 

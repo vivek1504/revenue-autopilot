@@ -74,10 +74,12 @@ export class ActionGateway {
       const expireBy = Math.floor(Date.now() / 1000) + proposal.expiry_hours * 3600;
       const callbackBaseUrl = process.env.CALLBACK_BASE_URL || 'http://localhost:3001';
 
+      const refId = `ap_${key.replace('autopilot_', '')}_${Date.now().toString(36)}`.slice(0, 40);
+
       const link = await this.client.createPaymentLink({
         amountPaise: discountedAmountPaise,
         description: `Recovery offer for ${proposal.customer_id}`,
-        referenceId: key,
+        referenceId: refId,
         expireBy,
         notes: {
           order_id: order.id,
@@ -96,10 +98,15 @@ export class ActionGateway {
         idempotency_key: key,
       };
     } catch (err: any) {
+      const errMsg =
+        err?.error?.description ||
+        err?.message ||
+        (typeof err === 'string' ? err : 'Unknown execution error');
+      console.error('[ActionGateway Error]', errMsg);
       return {
         mode: 'live',
         idempotency_key: key,
-        error: err instanceof Error ? err.message : 'Unknown execution error',
+        error: errMsg,
       };
     }
   }

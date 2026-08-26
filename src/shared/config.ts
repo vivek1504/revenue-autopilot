@@ -11,7 +11,7 @@ export const config = {
   },
   gemini: {
     apiKey: process.env.GEMINI_API_KEY || '',
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3.6-flash',
   },
   server: {
     port: parseInt(process.env.PORT || '3001', 10),
