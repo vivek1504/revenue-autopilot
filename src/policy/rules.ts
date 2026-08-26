@@ -1,14 +1,14 @@
-import Database from 'better-sqlite3';
+import { PrismaClient } from '@prisma/client';
 import { AgentProposal, PolicyViolation } from '../shared/types';
 import { MerchantPolicy } from './config';
 
 export interface RuleContext {
   proposal: AgentProposal;
   policy: MerchantPolicy;
-  db: Database.Database;
+  prisma: PrismaClient;
 }
 
-export type RuleCheck = (ctx: RuleContext) => PolicyViolation | null;
+export type RuleCheck = (ctx: RuleContext) => Promise<PolicyViolation | null> | PolicyViolation | null;
 
 const formatPaise = (paise: number) => `₹${(paise / 100).toLocaleString('en-IN')}`;
 
@@ -37,8 +37,11 @@ export const RULES: Record<string, RuleCheck> = {
     return null;
   },
 
-  customer_exists: ({ proposal, db }) => {
-    const customer = db.prepare('SELECT id FROM customers WHERE id = ?').get(proposal.customer_id);
+  customer_exists: async ({ proposal, prisma }) => {
+    const customer = await prisma.customer.findUnique({
+      where: { id: proposal.customer_id },
+      select: { id: true },
+    });
     if (!customer) {
       return {
         rule: 'customer_exists',
@@ -50,15 +53,16 @@ export const RULES: Record<string, RuleCheck> = {
     return null;
   },
 
-  duplicate_offer: ({ proposal, db }) => {
-    const existing = db
-      .prepare(
-        `SELECT id, created_at FROM recovery_offers 
-         WHERE customer_id = ? 
-         AND status IN ('pending', 'sent')
-         AND datetime(created_at) >= datetime('now', '-24 hours')`
-      )
-      .get(proposal.customer_id) as any;
+  duplicate_offer: async ({ proposal, prisma }) => {
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const existing = await prisma.recoveryOffer.findFirst({
+      where: {
+        customer_id: proposal.customer_id,
+        status: { in: ['pending', 'sent'] },
+        created_at: { gte: twentyFourHoursAgo },
+      },
+      select: { id: true, created_at: true },
+    });
 
     if (existing) {
       return {
@@ -118,15 +122,16 @@ export const RULES: Record<string, RuleCheck> = {
     return null;
   },
 
-  evidence_consistent: ({ proposal, db }) => {
+  evidence_consistent: async ({ proposal, prisma }) => {
     const ev = proposal.evidence;
     if (!ev) return null;
 
     // Verify lifetime spend if provided
     if (ev.lifetime_spend_paise !== undefined) {
-      const cust = db
-        .prepare('SELECT lifetime_spend_paise FROM customers WHERE id = ?')
-        .get(proposal.customer_id) as any;
+      const cust = await prisma.customer.findUnique({
+        where: { id: proposal.customer_id },
+        select: { lifetime_spend_paise: true },
+      });
 
       if (cust && cust.lifetime_spend_paise !== ev.lifetime_spend_paise) {
         return {
@@ -140,9 +145,13 @@ export const RULES: Record<string, RuleCheck> = {
 
     // Verify cart value if provided
     if (ev.cart_value_paise !== undefined && proposal.opportunity_type === 'abandoned_checkout') {
-      const cart = db
-        .prepare("SELECT total_paise FROM carts WHERE customer_id = ? AND status = 'abandoned'")
-        .get(proposal.customer_id) as any;
+      const cart = await prisma.cart.findFirst({
+        where: {
+          customer_id: proposal.customer_id,
+          status: 'abandoned',
+        },
+        select: { total_paise: true },
+      });
 
       if (cart && cart.total_paise !== ev.cart_value_paise) {
         return {
