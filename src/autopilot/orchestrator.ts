@@ -48,8 +48,9 @@ export async function runAutopilot(
   // 1. Detect opportunities (Measure discovery latency)
   const t0 = performance.now();
   let opportunities = await detectOpportunities(prismaClient);
-  const discoveryMs = performance.now() - t0;
-  liveTelemetryStats.p99_discovery_ms = Math.round(discoveryMs * 10) / 10 || 1.2;
+  const discoveryMs = Math.round((performance.now() - t0) * 10) / 10;
+  liveTelemetryStats.avg_discovery_ms = discoveryMs;
+  liveTelemetryStats.p99_discovery_ms = discoveryMs;
 
   if (options.limit && options.limit > 0) {
     opportunities = opportunities.slice(0, options.limit);
@@ -79,9 +80,11 @@ export async function runAutopilot(
     try {
       // Step 2: Agent proposes action (Measure LLM / reasoning time)
       const tLlm0 = performance.now();
-      const proposal = await agent.proposeAction(opp, mode);
+      const proposalResult = await agent.proposeAction(opp, mode);
+      const proposal = proposalResult.proposal;
+      const reasoning = proposalResult.reasoning;
       const llmDuration = performance.now() - tLlm0;
-      llmLatencies.push(llmDuration);
+      llmLatencies.push(reasoning.latency_ms || llmDuration);
       options.onProgress?.({ type: 'proposal', proposal });
 
       // Step 3: Policy Engine evaluates proposal (Measure policy latency)
@@ -106,6 +109,13 @@ export async function runAutopilot(
         // Save recovery offer record to DB via Prisma
         const now = new Date();
         const expiresAt = new Date(now.getTime() + proposal.expiry_hours * 60 * 60 * 1000);
+        
+        if (mode === 'simulated') {
+          await prismaClient.recoveryOffer.deleteMany({
+            where: { customer_id: proposal.customer_id, status: 'simulated' },
+          });
+        }
+
         await prismaClient.recoveryOffer.create({
           data: {
             id: `off_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -113,7 +123,7 @@ export async function runAutopilot(
             action_type: proposal.action,
             amount_paise: proposal.amount_paise,
             discount_percent: proposal.discount_percent,
-            status: 'sent',
+            status: mode === 'live' ? 'sent' : 'simulated',
             created_at: now,
             expires_at: expiresAt,
             razorpay_payment_link_id: execution.razorpay_payment_link_id || null,
@@ -127,7 +137,7 @@ export async function runAutopilot(
 
       // Step 5: Append to Audit Log (Measure SHA-256 ledger append latency)
       const tLedg0 = performance.now();
-      const auditRecord = auditLogger.append(proposal, verdict, execution);
+      const auditRecord = auditLogger.append(proposal, verdict, execution, reasoning);
       const ledgDuration = performance.now() - tLedg0;
       ledgerLatencies.push(ledgDuration);
 
@@ -153,13 +163,19 @@ export async function runAutopilot(
 
   // Compute live measured statistics
   if (llmLatencies.length > 0) {
-    liveTelemetryStats.p99_llm_ms = Math.round((llmLatencies.reduce((a, b) => a + b, 0) / llmLatencies.length) * 10) / 10;
+    const avgLlm = Math.round((llmLatencies.reduce((a, b) => a + b, 0) / llmLatencies.length) * 10) / 10;
+    liveTelemetryStats.avg_llm_ms = avgLlm;
+    liveTelemetryStats.p99_llm_ms = avgLlm;
   }
   if (policyLatencies.length > 0) {
-    liveTelemetryStats.p99_policy_ms = Math.round((policyLatencies.reduce((a, b) => a + b, 0) / policyLatencies.length) * 100) / 100;
+    const avgPol = Math.round((policyLatencies.reduce((a, b) => a + b, 0) / policyLatencies.length) * 100) / 100;
+    liveTelemetryStats.avg_policy_ms = avgPol;
+    liveTelemetryStats.p99_policy_ms = avgPol;
   }
   if (ledgerLatencies.length > 0) {
-    liveTelemetryStats.p99_ledger_ms = Math.round((ledgerLatencies.reduce((a, b) => a + b, 0) / ledgerLatencies.length) * 100) / 100;
+    const avgLedg = Math.round((ledgerLatencies.reduce((a, b) => a + b, 0) / ledgerLatencies.length) * 100) / 100;
+    liveTelemetryStats.avg_ledger_ms = avgLedg;
+    liveTelemetryStats.p99_ledger_ms = avgLedg;
   }
   if (durationMs > 0 && opportunities.length > 0) {
     liveTelemetryStats.throughput_ops_sec = Math.round((opportunities.length / (durationMs / 1000)));

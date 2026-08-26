@@ -1,18 +1,24 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { AgentProposal } from '../shared/types';
+import { AgentProposal, LLMReasoningMetadata } from '../shared/types';
 import { CustomerOpportunity } from './detector';
 import { buildUserPrompt, SYSTEM_PROMPT } from './prompts';
 import { AgentProposalSchema, GEMINI_PROPOSAL_RESPONSE_SCHEMA } from './schemas';
 
+export interface ProposalWithReasoning {
+  proposal: AgentProposal;
+  reasoning: LLMReasoningMetadata;
+}
+
 export class RevenueAgent {
   private genAI?: GoogleGenerativeAI;
   private model?: any;
+  private modelName = 'gemini-3.6-flash';
 
   constructor(apiKey?: string) {
     if (apiKey && apiKey !== 'dummy_gemini_key') {
       this.genAI = new GoogleGenerativeAI(apiKey);
       this.model = this.genAI.getGenerativeModel({
-        model: 'gemini-3.6-flash',
+        model: this.modelName,
         generationConfig: {
           responseMimeType: 'application/json',
           responseSchema: GEMINI_PROPOSAL_RESPONSE_SCHEMA,
@@ -24,11 +30,23 @@ export class RevenueAgent {
   async proposeAction(
     opportunity: CustomerOpportunity,
     mode: 'live' | 'simulated' = 'simulated'
-  ): Promise<AgentProposal> {
+  ): Promise<ProposalWithReasoning> {
+    const t0 = performance.now();
+
     // In simulated mode or if LLM model is not configured/ready, use instant structured decision proposal
     if (mode === 'simulated' || !this.model) {
       console.log("\x1b[1m\x1b[32musing fallback for proposal\x1b[0m");
-      return this.fallbackProposal(opportunity);
+      const proposal = this.fallbackProposal(opportunity);
+      const latency_ms = Math.round((performance.now() - t0) * 100) / 100;
+      return {
+        proposal,
+        reasoning: {
+          model: 'deterministic_heuristic_fallback',
+          latency_ms,
+          used_fallback: true,
+          fallback_reason: mode === 'simulated' ? 'simulated_mode_active' : 'llm_not_configured',
+        },
+      };
     }
 
     try {
@@ -56,6 +74,7 @@ export class RevenueAgent {
         ],
       });
 
+      const latency_ms = Math.round((performance.now() - t0) * 100) / 100;
       const text = result.response.text();
       const raw = JSON.parse(text);
 
@@ -63,29 +82,48 @@ export class RevenueAgent {
       if (!validated.confidence_score) {
         validated.confidence_score = opportunity.customer.tier === 'vip' ? 0.96 : 0.91;
       }
-      return validated;
+
+      return {
+        proposal: validated,
+        reasoning: {
+          raw_response: text,
+          model: this.modelName,
+          latency_ms,
+          used_fallback: false,
+        },
+      };
     } catch (err: any) {
+      const latency_ms = Math.round((performance.now() - t0) * 100) / 100;
       console.warn(
         `[RevenueAgent] LLM generation warning for ${opportunity.customer.id}: ${err.message}. Using structured fallback proposal.`
       );
-      return this.fallbackProposal(opportunity);
+      const proposal = this.fallbackProposal(opportunity);
+      return {
+        proposal,
+        reasoning: {
+          model: 'deterministic_heuristic_fallback',
+          latency_ms,
+          used_fallback: true,
+          fallback_reason: `llm_error: ${err.message}`,
+        },
+      };
     }
   }
 
   async proposeBatch(
     opportunities: CustomerOpportunity[],
-    onProposal?: (proposal: AgentProposal, index: number) => void,
+    onProposal?: (item: ProposalWithReasoning, index: number) => void,
     mode: 'live' | 'simulated' = 'simulated'
-  ): Promise<AgentProposal[]> {
-    const proposals: AgentProposal[] = [];
+  ): Promise<ProposalWithReasoning[]> {
+    const proposals: ProposalWithReasoning[] = [];
 
     for (let i = 0; i < opportunities.length; i++) {
       const opp = opportunities[i]!;
-      const proposal = await this.proposeAction(opp, mode);
-      proposals.push(proposal);
+      const result = await this.proposeAction(opp, mode);
+      proposals.push(result);
 
       if (onProposal) {
-        onProposal(proposal, i);
+        onProposal(result, i);
       }
     }
 
@@ -183,15 +221,15 @@ export class RevenueAgent {
       };
     }
 
-    // Default re-engagement or reminder
+    // Default re-engagement offer
     return {
       customer_id: customerId,
-      action: 'payment_reminder',
+      action: 'discounted_payment_link',
       amount_paise: 249900,
       discount_percent: 10,
       expiry_hours: 72,
       confidence_score: 0.82,
-      reason: `Customer inactive for over 30 days. Proposing re-engagement offer.`,
+      reason: `Customer inactive for over 30 days. Proposing re-engagement offer with 10% discount.`,
       opportunity_type: 're_engagement',
       evidence: {
         lifetime_spend_paise: customer.lifetime_spend_paise,
