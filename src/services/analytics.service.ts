@@ -2,29 +2,62 @@ import { ProcessedAction, TimeSeriesPoint, CohortPerformance } from '../shared/t
 
 export class AnalyticsService {
   public getTimeseries(items: ProcessedAction[]): TimeSeriesPoint[] {
-    const approvedTotal = items
-      .filter((r) => r.verdict.verdict === 'APPROVED')
-      .reduce((sum, r) => sum + (r.proposal.amount_paise || 0), 0);
+    if (items.length === 0) {
+      return [];
+    }
 
-    const totalVolume = items.reduce(
-      (sum, r) => sum + (r.proposal.amount_paise || 0),
-      0
-    );
+    const pointsMap = new Map<string, { label: string; recoverable_paise: number; recovered_paise: number }>();
 
-    const months = [
-      { period: '2026-01', label: 'Jan 1', factorRecoverable: 0.20, factorRecovered: 0.12 },
-      { period: '2026-02', label: 'Feb 1', factorRecoverable: 0.38, factorRecovered: 0.28 },
-      { period: '2026-03', label: 'Mar 1', factorRecoverable: 0.55, factorRecovered: 0.46 },
-      { period: '2026-04', label: 'Apr 1', factorRecoverable: 0.72, factorRecovered: 0.65 },
-      { period: '2026-05', label: 'May 1', factorRecoverable: 0.88, factorRecovered: 0.82 },
-      { period: '2026-06', label: 'Jun 1', factorRecoverable: 1.00, factorRecovered: 1.00 },
-    ];
+    const sorted = [...items].sort((a, b) => {
+      const tA = new Date(a.auditRecord?.timestamp || 0).getTime();
+      const tB = new Date(b.auditRecord?.timestamp || 0).getTime();
+      return tA - tB;
+    });
 
-    return months.map((m) => ({
-      period: m.period,
-      label: m.label,
-      recoverable_paise: Math.round(totalVolume * m.factorRecoverable),
-      recovered_paise: Math.round(approvedTotal * m.factorRecovered),
+    for (const item of sorted) {
+      const ts = item.auditRecord?.timestamp ? new Date(item.auditRecord.timestamp) : new Date();
+      const dateKey = ts.toISOString().split('T')[0]!;
+      const label = ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+      const current = pointsMap.get(dateKey) || {
+        label,
+        recoverable_paise: 0,
+        recovered_paise: 0,
+      };
+
+      if (item.verdict.verdict === 'APPROVED') {
+        const discounted = Math.round(
+          (item.proposal.amount_paise || 0) * (1 - (item.proposal.discount_percent || 0) / 100)
+        );
+        current.recoverable_paise += discounted;
+      }
+      pointsMap.set(dateKey, current);
+    }
+
+    const entries = Array.from(pointsMap.entries());
+    if (entries.length === 1) {
+      const [key, data] = entries[0]!;
+      return [
+        {
+          period: `${key}-init`,
+          label: 'Pre-Scan',
+          recoverable_paise: 0,
+          recovered_paise: 0,
+        },
+        {
+          period: key,
+          label: data.label,
+          recoverable_paise: data.recoverable_paise,
+          recovered_paise: data.recovered_paise,
+        },
+      ];
+    }
+
+    return entries.map(([period, data]) => ({
+      period,
+      label: data.label,
+      recoverable_paise: data.recoverable_paise,
+      recovered_paise: data.recovered_paise,
     }));
   }
 

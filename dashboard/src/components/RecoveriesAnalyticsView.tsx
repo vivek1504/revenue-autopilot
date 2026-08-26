@@ -436,7 +436,7 @@ export const RecoveriesAnalyticsView: React.FC<RecoveriesAnalyticsViewProps> = (
               </span>
             </div>
             <p className="text-xs text-slate-500 mb-4">
-              Breakdown of deterministic guardrail violations that intercepted unsafe agent proposals.
+              Breakdown of deterministic guardrail violations that intercepted unsafe agent proposals (may reflect multiple rule triggers per blocked action).
             </p>
 
             <div className="space-y-3.5">
@@ -465,13 +465,6 @@ export const RecoveriesAnalyticsView: React.FC<RecoveriesAnalyticsViewProps> = (
                 );
               })}
             </div>
-          </div>
-
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>Deterministic Guarantee:</span>
-            <strong className="font-tabular text-emerald-700 font-bold">
-              100% Policy Engine Enforcement
-            </strong>
           </div>
         </div>
       </div>

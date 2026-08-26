@@ -11,10 +11,11 @@ import {
   XCircle,
   ExternalLink,
   ChevronRight,
+  Clock,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { AutopilotEvent, DashboardSummary, ProcessedAction, TimeSeriesPoint } from '../types';
+import { AutopilotEvent, AuditVerificationResult, DashboardSummary, ProcessedAction, TimeSeriesPoint } from '../types';
 
 interface ExecutiveDashboardViewProps {
   summary: DashboardSummary | null;
@@ -22,6 +23,7 @@ interface ExecutiveDashboardViewProps {
   items: ProcessedAction[];
   events?: AutopilotEvent[];
   status: 'idle' | 'running' | 'complete';
+  verificationResult?: AuditVerificationResult | null;
   onSelectVerdict: (item: ProcessedAction) => void;
   onNavigateToTab: (tab: any) => void;
 }
@@ -32,6 +34,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
   items,
   events = [],
   status,
+  verificationResult,
   onSelectVerdict,
   onNavigateToTab,
 }) => {
@@ -129,65 +132,107 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
     ? items.filter((i) => i.verdict.verdict === 'BLOCKED').reduce((sum, i) => sum + (i.proposal.amount_paise || 0), 0)
     : (summary?.unsafe_value_blocked_paise ?? 0);
   const verifiedCount = opportunitiesCount;
+  const recoveredPaise = summary?.recovered_value_paise || 0;
+  const redeemedCount = summary?.redeemed_count || 0;
 
   return (
     <div className="space-y-6 pb-12 font-sans">
-      {/* 1. Top 4 Metric Cards (Essential At-a-Glance Story) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Opportunities Identified */}
+      {/* 1. Top 5 Metric Cards (Real Measured Recovery + Safety Story) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Card 2: Recoverable Approved Value */}
         <div className="bg-white border border-slate-200/80 rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32">
           <div className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
-            Opportunities Identified
+            Recoverable (Approved)
+          </div>
+          <div className="text-2xl lg:text-3xl font-extrabold text-slate-900 font-tabular">
+            {formatRupees(approvedPaise2)}
+          </div>
+          <div className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>{approvedCount} active links created</span>
+          </div>
+        </div>
+
+        {/* Card 1: Measured Money Recovered */}
+        <div className="bg-white text-white border border-slate-200/80 rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32">
+          <div className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
+            Recovered
+          </div>
+          <div className="text-2xl lg:text-3xl font-extrabold text-emerald-700 font-tabular">
+            {formatRupees(recoveredPaise)}
+          </div>
+          <div className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+            <span>{redeemedCount} webhook-verified paid offers</span>
+          </div>
+        </div>
+
+        {/* Card 3: Unsafe Value Blocked */}
+        <div className="bg-white border border-slate-200/80 rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32">
+          <div className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
+            Revenue Protected
+          </div>
+          <div className="text-2xl lg:text-3xl font-extrabold text-rose-700 font-tabular truncate">
+            {formatRupees(blockedPaise)}
+          </div>
+          <div className="text-xs font-semibold text-rose-700 flex items-center gap-1">
+            <XCircle className="w-3.5 h-3.5 text-rose-600" />
+            <span>{blockedCount2} policy violations blocked</span>
+          </div>
+        </div>
+
+        {/* Card 4: Total Opportunities */}
+        <div className="bg-white border border-slate-200/80 rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32">
+          <div className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
+            Scanned Opportunities
           </div>
           <div className="text-3xl font-extrabold text-slate-900 font-tabular">
             {opportunitiesCount}
           </div>
           <div className="text-xs font-semibold text-slate-700 flex items-center gap-1">
             <CheckCircle2 className="w-3.5 h-3.5 text-slate-600" />
-            <span>Total Opportunities Identified</span>
-          </div>
-
-        </div>
-
-        {/* Card 2: Actions Approved */}
-        <div className="bg-white border border-slate-200/80 rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32">
-          <div className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
-            Actions Approved
-          </div>
-          <div className="text-2xl lg:text-3xl font-extrabold text-emerald-600 font-tabular">
-            {approvedCount}
-          </div>
-          <div className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Policy Passed and links created</span>
+            <span>AI scanned & evaluated</span>
           </div>
         </div>
 
-        {/* Card 3: Actions Blocked */}
-        <div className="bg-white border border-slate-200/80 rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32">
+        {/* Card 5: Audit Chain Status */}
+        <div className={`bg-white border rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32 ${verificationResult && !verificationResult.valid
+          ? 'border-rose-300 bg-rose-50/30'
+          : 'border-slate-200/80'
+          }`}>
           <div className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
-            Actions Blocked
+            SHA-256 Audit Chain
           </div>
-          <div className="text-2xl lg:text-3xl font-extrabold text-amber-700 font-tabular truncate">
-            {blockedCount2}
+          <div className={`text-xl lg:text-2xl font-extrabold font-tabular truncate ${verificationResult && !verificationResult.valid ? 'text-rose-700' : 'text-slate-900'
+            }`}>
+            {verificationResult && !verificationResult.valid
+              ? `Corrupted · #${verificationResult.tampered_at?.sequence || 1}`
+              : (verificationResult && verificationResult.total_records > 0)
+                ? `Intact · ${verificationResult.verified_records}/${verificationResult.total_records}`
+                : `Pending · 0 entries`}
           </div>
-          <div className="text-xs font-semibold text-amber-700 flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5 text-amber-700" />
-            <span>Unsafe automated movement prevented</span>
-          </div>
-        </div>
-
-        {/* Card 4: Audit Chain Status */}
-        <div className="bg-white border border-slate-200/80 rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32">
-          <div className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
-            Audit Chain Status
-          </div>
-          <div className="text-2xl lg:text-3xl font-extrabold text-slate-900 font-tabular">
-            Intact · {verifiedCount}/{verifiedCount}
-          </div>
-          <div className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>SHA-256 ledger verified</span>
+          <div className={`text-xs font-semibold flex items-center gap-1 truncate ${verificationResult && !verificationResult.valid
+            ? 'text-rose-700'
+            : (verificationResult && verificationResult.total_records > 0)
+              ? 'text-emerald-700'
+              : 'text-slate-500'
+            }`}>
+            {verificationResult && !verificationResult.valid ? (
+              <>
+                <XCircle className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" />
+                <span className="truncate">Tamper detected at #{verificationResult.tampered_at?.sequence || 1}</span>
+              </>
+            ) : (verificationResult && verificationResult.total_records > 0) ? (
+              <>
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                <span className="truncate">Cryptographic ledger verified</span>
+              </>
+            ) : (
+              <>
+                <Clock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                <span className="truncate">Run scan to record</span>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -566,7 +611,11 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
 
           <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span>Cryptographic Chain Status:</span>
-            <strong className="text-emerald-700">SHA-256 Verified</strong>
+            {verificationResult && !verificationResult.valid ? (
+              <strong className="text-rose-600 font-bold">Tamper Caught (#1)</strong>
+            ) : (
+              <strong className="text-emerald-700 font-bold">SHA-256 Verified</strong>
+            )}
           </div>
         </div>
       </div>
