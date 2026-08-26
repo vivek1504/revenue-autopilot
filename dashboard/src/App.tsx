@@ -32,6 +32,7 @@ export function App() {
   } = useAutopilot();
 
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
+  const [executionMode, setExecutionMode] = useState<'live' | 'simulated'>('live');
   const [selectedVerdictItem, setSelectedVerdictItem] = useState<ProcessedAction | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -42,7 +43,9 @@ export function App() {
         currentTab={currentTab}
         onSelectTab={(tab) => setCurrentTab(tab)}
         status={status}
-        onRun={() => run('simulated')}
+        executionMode={executionMode}
+        onModeChange={(m) => setExecutionMode(m)}
+        onRun={() => run(executionMode)}
         processedCount={processedActions.length}
         totalCount={totalOpportunities || summary?.opportunities_count || 0}
         onExport={() => exportReport('csv')}

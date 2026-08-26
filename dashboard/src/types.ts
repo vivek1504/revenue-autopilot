@@ -154,13 +154,18 @@ export interface RuleCatchItem {
 
 export interface TelemetryBenchmarks {
   avg_confidence: number;
-  compliance_rate_pct: number;
+  block_rate_pct: number;
+  blocked_proposals_count: number;
+  total_proposals_count: number;
+  avg_llm_latency_ms: number;
+  llm_call_count: number;
+  verified_audit_records_count: number;
+  hash_chain_intact: boolean;
   p99_discovery_ms: number;
   p99_policy_ms: number;
   p99_ledger_ms: number;
   p99_llm_ms: number;
   throughput_ops_sec: number;
-  active_pipelines_count: number;
   rule_catches: RuleCatchItem[];
 }
 

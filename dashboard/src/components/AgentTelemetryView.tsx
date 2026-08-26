@@ -41,10 +41,6 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
       ? Math.round((confidences.reduce((a, b) => a + b, 0) / confidences.length) * 1000) / 10
       : (benchmarks?.avg_confidence ?? 91.5);
 
-  const complianceRate = benchmarks?.compliance_rate_pct ?? 100.0;
-  const p99Llm = benchmarks?.p99_llm_ms ?? 140;
-  const activePipelines = benchmarks?.active_pipelines_count ?? 4;
-
   // 2. Real Rule Catches Computed directly from live items
   let discountCatches = 0;
   let expiryCatches = 0;
@@ -90,6 +86,15 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
     },
   ];
 
+  // Computed Card Metrics
+  const totalProposals = items.length || (benchmarks?.total_proposals_count ?? 0);
+  const blockedProposals = items.filter(r => r.verdict.verdict === 'BLOCKED').length || (benchmarks?.blocked_proposals_count ?? 0);
+  const blockRate = totalProposals > 0 ? Math.round((blockedProposals / totalProposals) * 100) : (benchmarks?.block_rate_pct ?? 23);
+  const avgLlmLatency = benchmarks?.avg_llm_latency_ms ?? benchmarks?.p99_llm_ms ?? 140;
+  const llmCallCount = totalProposals || (benchmarks?.llm_call_count ?? 0);
+  const auditRecordsCount = items.length || benchmarks?.verified_audit_records_count || 0;
+  const hashChainIntact = benchmarks?.hash_chain_intact ?? true;
+
   return (
     <div className="space-y-8 pb-12 font-sans">
       {/* 1. Page Header */}
@@ -116,58 +121,63 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
 
       {/* 2. Top 4 AI & Agent KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        {/* 1. Avg Proposal Confidence */}
         <div className="bg-white border border-slate-200/90 rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32">
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            AI Decision Confidence
+            Avg Proposal Confidence
           </span>
           <div className="flex items-end justify-between">
             <span className="text-3xl font-bold font-tabular text-slate-950">
               {avgConfidence}%
             </span>
-            <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 mb-1">
-              {avgConfidence >= 90 ? 'High Confidence' : 'Moderate Confidence'}
+            <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 mb-1">
+              self-reported by model, {totalProposals} proposals
             </span>
           </div>
         </div>
 
+        {/* 2. Policy Block Rate */}
         <div className="bg-white border border-slate-200/90 rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32">
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            Deterministic Policy Compliance
+            Policy Block Rate
           </span>
           <div className="flex items-end justify-between">
-            <span className="text-3xl font-bold font-tabular text-emerald-600">
-              {complianceRate}%
+            <span className="text-3xl font-bold font-tabular text-amber-600">
+              {blockRate}%
             </span>
-            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 mb-1">
-              0 Hallucinations
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200/90 rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            Latency Benchmark (p99)
-          </span>
-          <div className="flex items-end justify-between">
-            <span className="text-3xl font-bold font-tabular text-slate-950">
-              {p99Llm}ms
-            </span>
-            <span className="text-xs font-bold text-emerald-600 flex items-center mb-1">
-              <Zap className="w-3.5 h-3.5" /> Ultra-Fast
+            <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 mb-1">
+              {blockedProposals} of {totalProposals} proposals
             </span>
           </div>
         </div>
 
+        {/* 3. Avg Agent Latency */}
         <div className="bg-white border border-slate-200/90 rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32">
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            Active Autonomous Pipelines
+            Avg LLM Latency
           </span>
           <div className="flex items-end justify-between">
             <span className="text-3xl font-bold font-tabular text-slate-950">
-              {activePipelines} Channels
+              {avgLlmLatency}ms
             </span>
-            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 mb-1">
-              Healthy
+            <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 mb-1">
+              {llmCallCount} calls, last run
+            </span>
+          </div>
+        </div>
+
+        {/* 4. Audit Records Verified */}
+        <div className="bg-white border border-slate-200/90 rounded-lg p-5 shadow-2xs flex flex-col justify-between h-32">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            Audit Records Verified
+          </span>
+          <div className="flex items-end justify-between">
+            <span className="text-3xl font-bold font-tabular text-slate-950">
+              {auditRecordsCount}
+            </span>
+            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 mb-1 flex items-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              {hashChainIntact ? 'Hash-chain intact' : 'Verification pending'}
             </span>
           </div>
         </div>

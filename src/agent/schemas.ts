@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { SchemaType, ResponseSchema } from '@google/generative-ai';
 
 export const AgentProposalSchema = z.object({
-  customer_id: z.string().regex(/^cust_\d{3}$/),
+  customer_id: z.string().regex(/^cust_[a-zA-Z0-9_]+$/),
   action: z.enum([
     'discounted_payment_link',
     'payment_reminder',
@@ -36,7 +36,7 @@ export const GEMINI_PROPOSAL_RESPONSE_SCHEMA: ResponseSchema = {
   properties: {
     customer_id: {
       type: SchemaType.STRING,
-      description: 'The customer identifier, format cust_XXX e.g. cust_042',
+      description: 'The customer identifier e.g. cust_042 or cust_demo_01',
     },
     action: {
       type: SchemaType.STRING,

@@ -27,6 +27,7 @@ export class RevenueAgent {
   ): Promise<AgentProposal> {
     // In simulated mode or if LLM model is not configured/ready, use instant structured decision proposal
     if (mode === 'simulated' || !this.model) {
+      console.log("\x1b[1m\x1b[32musing fallback for proposal\x1b[0m");
       return this.fallbackProposal(opportunity);
     }
 
