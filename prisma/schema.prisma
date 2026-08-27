@@ -25,6 +25,7 @@ model Customer {
   orders               Order[]
   carts                Cart[]
   recovery_offers      RecoveryOffer[]
+  recovery_opportunities RecoveryOpportunity[]
 
   @@map("customers")
 }
@@ -73,21 +74,52 @@ model Cart {
   @@map("carts")
 }
 
+model RecoveryOpportunity {
+  id                    String          @id @default(uuid())
+  customer_id           String
+  idempotency_key       String          @unique
+  type                  String          // FAILED_PAYMENT | ABANDONED_CART | UPSELL | REENGAGEMENT
+  source_type           String?         // ORDER | CART
+  source_id             String?         // order.id or cart.id
+  strategy_key          String?         // PREMIUM_UPSELL, WINBACK
+  estimated_value_paise Int
+  value_is_estimated   Boolean         @default(false)
+  status                String          @default("OPEN")
+  detected_at           DateTime        @default(now())
+  resolved_at           DateTime?
+
+  customer              Customer        @relation(fields: [customer_id], references: [id])
+  recovery_offers       RecoveryOffer[]
+
+  @@index([customer_id])
+  @@index([status])
+  @@index([type])
+  @@map("recovery_opportunities")
+}
+
 model RecoveryOffer {
-  id                       String   @id
+  id                       String               @id
   customer_id              String
+  opportunity_id           String?
   action_type              String
   amount_paise             Int
-  discount_percent         Float    @default(0)
-  status                   String   @default("pending")
+  discount_percent         Float                @default(0)
+  status                   String               @default("PENDING")
+  execution_mode           String?
   created_at               DateTime
   expires_at               DateTime
   razorpay_payment_link_id String?
   razorpay_order_id        String?
+  opportunity_type         String?
+  policy_verdict           String?
+  ai_reason                String?
+  ai_confidence_score      Float?
 
-  customer Customer @relation(fields: [customer_id], references: [id])
+  customer                 Customer             @relation(fields: [customer_id], references: [id])
+  opportunity              RecoveryOpportunity? @relation(fields: [opportunity_id], references: [id])
 
   @@index([customer_id])
+  @@index([opportunity_id])
   @@index([razorpay_payment_link_id])
   @@index([status])
   @@map("recovery_offers")

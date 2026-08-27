@@ -3,16 +3,24 @@ import { OpportunityType } from './agent';
 export interface DashboardSummary {
   total_customers: number;
   opportunities_count: number;
+  revenue_at_risk_paise: number;
+  expansion_opportunity_paise: number;
   approved_count: number;
   blocked_count: number;
+  escalated_count: number;
+  dispatched_count: number;
+  recovered_count: number;
   unsafe_value_blocked_paise: number;
   approved_value_paise: number;
   recovered_value_paise: number;
+  approval_rate_pct: number;
   recovery_conversion_pct: number;
+  recovery_rate_value_pct: number;
+  recovery_yield_pct: number;
   avg_recovery_value_paise: number;
-  recovery_rate_pct: number;
   live_links_created: number;
-  redeemed_count: number;
+  recovery_rate_pct?: number;
+  redeemed_count?: number;
   deltas?: {
     recoverable_delta_pct?: number | null;
     recovered_delta_pct?: number | null;
@@ -27,6 +35,7 @@ export interface CohortPerformance {
   label: string;
   count: number;
   volume_paise: number;
+  approval_rate_pct?: number;
   conversion_rate_pct: number;
   percentage_of_total: number;
   color?: string;
@@ -69,5 +78,8 @@ export interface SystemSettings {
   max_discount_percent: number;
   max_expiry_hours: number;
   high_value_threshold_paise: number;
+  max_automated_amount_paise?: number;
+  max_contacts_per_week?: number;
+  min_confidence_score?: number;
   updated_at?: string;
 }
