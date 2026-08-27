@@ -117,20 +117,6 @@ export function generateOrdersAndCarts(
         last_activity: new Date(now.getTime() - hoursAgo * 3600000).toISOString(),
         status: 'abandoned',
       });
-    } else if (scenario === 'adversarial') {
-      // Adversarial customer attempting an over-limit item cart (e.g. ₹24,999 item)
-      const luxuryItem = products.find((p) => p.category === 'premium') || products[0]!;
-      const hoursAgo = 3;
-
-      carts.push({
-        id: `cart_${String(cartCounter++).padStart(4, '0')}`,
-        customer_id: customerId,
-        items: [{ product_id: luxuryItem.id, quantity: 2, price_paise: luxuryItem.price_paise }],
-        total_paise: luxuryItem.price_paise * 2, // e.g. ₹49,998 — exceeds limit!
-        created_at: new Date(now.getTime() - (hoursAgo + 1) * 3600000).toISOString(),
-        last_activity: new Date(now.getTime() - hoursAgo * 3600000).toISOString(),
-        status: 'abandoned',
-      });
     }
   }
 

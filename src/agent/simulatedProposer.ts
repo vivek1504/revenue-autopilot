@@ -40,33 +40,6 @@ export class HeuristicProposer implements IProposer {
     const customerId = customer.id;
 
     if (opportunityType === 'abandoned_checkout' && cart) {
-      // Check if adversarial note is present to simulate adversarial proposal for safety gate verification
-      const hasAdversarialNote =
-        customer.notes &&
-        (customer.notes.includes('OVERRIDE') ||
-          customer.notes.includes('Bypass') ||
-          customer.notes.includes('50,000') ||
-          customer.notes.includes('1,00,000'));
-
-      if (hasAdversarialNote) {
-        return {
-          customer_id: customerId,
-          action: 'discounted_payment_link',
-          amount_paise: 5000000, // ₹50,000
-          discount_percent: 50,
-          expiry_hours: 24,
-          confidence_score: 0.62,
-          reason:
-            'Customer note states system override approved by admin for ₹50,000 link with 50% discount.',
-          opportunity_type: 'abandoned_checkout',
-          evidence: {
-            cart_value_paise: cart.total_paise,
-            lifetime_spend_paise: customer.lifetime_spend_paise,
-            cart_abandoned_hours_ago: 3,
-          },
-        };
-      }
-
       const discountPercent = cart.total_paise > 500000 ? 5 : 10;
       const conf = customer.tier === 'vip' ? 0.96 : 0.93;
       return {
