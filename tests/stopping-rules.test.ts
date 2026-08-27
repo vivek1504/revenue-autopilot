@@ -12,6 +12,7 @@ describe('PolicyEngine Stopping Rules & Escalation Gates', () => {
 
     // Clean up test data
     await prisma.recoveryOffer.deleteMany({ where: { customer_id: 'cust_stop_01' } });
+    await prisma.recoveryOpportunity.deleteMany({ where: { customer_id: 'cust_stop_01' } });
     await prisma.cart.deleteMany({ where: { customer_id: 'cust_stop_01' } });
     await prisma.order.deleteMany({ where: { customer_id: 'cust_stop_01' } });
     await prisma.customer.deleteMany({ where: { id: 'cust_stop_01' } });
@@ -93,14 +94,24 @@ describe('PolicyEngine Stopping Rules & Escalation Gates', () => {
     expect(result.violations.some((v) => v.rule === 'contact_frequency')).toBe(true);
   });
 
-  it('should BLOCK and escalate proposals above human review threshold (₹25,000+)', async () => {
+  it('should return ESCALATED when proposal exceeds high-value threshold but passes all other rules', async () => {
     // Clear past offers
     await prisma.recoveryOffer.deleteMany({ where: { customer_id: 'cust_stop_01' } });
+
+    // Custom engine where automated cap is ₹50,000 but escalation threshold is ₹25,000
+    const customEngine = new PolicyEngine(
+      {
+        ...DEFAULT_MERCHANT_POLICY,
+        maxAutomatedTransactionPaise: 5000000,
+        humanEscalationThresholdPaise: 2500000,
+      },
+      prisma
+    );
 
     const highValueProposal: AgentProposal = {
       customer_id: 'cust_stop_01',
       action: 'discounted_payment_link',
-      amount_paise: 3000000, // ₹30,000 (exceeds ₹25,000 human escalation threshold)
+      amount_paise: 3000000, // ₹30,000 (exceeds ₹25,000 threshold, but within ₹50,000 cap)
       discount_percent: 5,
       expiry_hours: 24,
       confidence_score: 0.95,
@@ -111,8 +122,31 @@ describe('PolicyEngine Stopping Rules & Escalation Gates', () => {
       },
     };
 
-    const result = await policyEngine.evaluate(highValueProposal);
+    const result = await customEngine.evaluate(highValueProposal);
+    expect(result.verdict).toBe('ESCALATED');
+    expect(result.violations.some((v) => v.rule === 'human_escalation')).toBe(true);
+  });
+
+  it('should return BLOCKED when proposal exceeds both automated limit and human review threshold', async () => {
+    await prisma.recoveryOffer.deleteMany({ where: { customer_id: 'cust_stop_01' } });
+
+    const overLimitProposal: AgentProposal = {
+      customer_id: 'cust_stop_01',
+      action: 'discounted_payment_link',
+      amount_paise: 3000000, // ₹30,000 (exceeds default ₹10,000 amount limit AND ₹25,000 escalation)
+      discount_percent: 5,
+      expiry_hours: 24,
+      confidence_score: 0.95,
+      reason: 'High-value enterprise tier order recovery',
+      opportunity_type: 'abandoned_checkout',
+      evidence: {
+        lifetime_spend_paise: 5000000,
+      },
+    };
+
+    const result = await policyEngine.evaluate(overLimitProposal);
     expect(result.verdict).toBe('BLOCKED');
+    expect(result.violations.some((v) => v.rule === 'amount_limit')).toBe(true);
     expect(result.violations.some((v) => v.rule === 'human_escalation')).toBe(true);
   });
 
