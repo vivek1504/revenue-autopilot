@@ -244,6 +244,29 @@ export function useAutopilot() {
     }
   }, [refreshAll]);
 
+  const simulatePayment = useCallback(
+    async (offerId: string) => {
+      try {
+        const res = await fetch('/api/simulate/payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ offer_id: offerId }),
+        });
+        if (res.ok) {
+          await refreshAll();
+          return await res.json();
+        } else {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to simulate payment');
+        }
+      } catch (err: any) {
+        console.error('Failed to simulate payment:', err);
+        throw err;
+      }
+    },
+    [refreshAll]
+  );
+
   useEffect(() => {
     refreshAll();
   }, [refreshAll]);
@@ -264,6 +287,7 @@ export function useAutopilot() {
     run,
     runVerification,
     tamperRecord,
+    simulatePayment,
     saveSettings,
     exportReport,
     refreshAll,

@@ -45,7 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'pipelines' as NavTab, label: 'Pipelines', icon: GitFork },
     { id: 'audit' as NavTab, label: 'Audit Log & Ledger', icon: History },
     { id: 'recoveries' as NavTab, label: 'Recoveries & Analytics', icon: CreditCard },
-    { id: 'telemetry' as NavTab, label: 'Agent Telemetry', icon: Bot },
+    { id: 'telemetry' as NavTab, label: 'Observability', icon: Bot },
     { id: 'settings' as NavTab, label: 'Settings & Policy', icon: Settings },
   ];
 
