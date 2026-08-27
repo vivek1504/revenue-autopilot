@@ -37,7 +37,13 @@ export class PolicyEngine {
       }
     }
 
-    const verdict = violations.length === 0 ? 'APPROVED' : 'BLOCKED';
+    let verdict: PolicyResult['verdict'];
+    if (violations.length === 0) {
+      verdict = 'APPROVED';
+    } else {
+      const escalationOnly = violations.every((v) => v.rule === 'human_escalation');
+      verdict = escalationOnly ? 'ESCALATED' : 'BLOCKED';
+    }
 
     return {
       verdict,
