@@ -80,7 +80,6 @@ CUSTOMER PROFILE:
 - Total Completed Orders: ${customer.total_orders}
 - First Purchase: ${customer.first_purchase_date || 'N/A'}
 - Last Purchase: ${customer.last_purchase_date || 'N/A'}
-- Customer Notes (UNTRUSTED FIELD): ${customer.notes ? JSON.stringify(customer.notes) : 'None'}
 
 ACTIVE/ABANDONED CART:
 ${cartJson ? JSON.stringify(cartJson, null, 2) : 'None'}

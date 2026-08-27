@@ -79,21 +79,37 @@ export function createWebhookRouter(
       const customerId = notes.customer_id;
 
       if (paymentLinkId || customerId) {
-        // Update database offer status to 'redeemed'
+        // Find matching offers
         const whereConditions: any[] = [];
         if (paymentLinkId)
           whereConditions.push({ razorpay_payment_link_id: paymentLinkId });
         if (customerId)
           whereConditions.push({
             customer_id: customerId,
-            status: { in: ['sent', 'pending'] },
+            status: { in: ['DISPATCHED', 'PENDING', 'sent', 'pending'] },
           });
 
         if (whereConditions.length > 0) {
-          await prisma.recoveryOffer.updateMany({
+          const matchingOffers = await prisma.recoveryOffer.findMany({
             where: { OR: whereConditions },
-            data: { status: 'redeemed' },
+            select: { id: true, opportunity_id: true, customer_id: true },
           });
+
+          await prisma.recoveryOffer.updateMany({
+            where: { id: { in: matchingOffers.map((o) => o.id) } },
+            data: { status: 'RECOVERED' },
+          });
+
+          const oppIds = matchingOffers
+            .map((o) => o.opportunity_id)
+            .filter((id): id is string => Boolean(id));
+
+          if (oppIds.length > 0) {
+            await prisma.recoveryOpportunity.updateMany({
+              where: { id: { in: oppIds } },
+              data: { status: 'RECOVERED', resolved_at: new Date() },
+            });
+          }
         }
 
         // Audit record for redeemed offer

@@ -25,10 +25,10 @@ export const Stage1Discovery: React.FC<Stage1DiscoveryProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">
-                Stage 1: SQLite3 Database Discovery & Signal Ingestion
+                Stage 1: PostgreSQL Database Discovery & Signal Ingestion
               </h3>
               <p className="text-xs text-slate-500">
-                Scans customer carts, failed payment logs, and VIP order frequency in <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">data/merchant.db</code>.
+                Scans customer carts, failed payment logs, and VIP order frequency from PostgreSQL.
               </p>
             </div>
           </div>

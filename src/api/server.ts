@@ -11,6 +11,7 @@ import { createExportRouter } from './routes/export';
 import { createAutopilotRouter } from './routes/autopilot';
 import { createAuditRouter } from './routes/audit';
 import { createWebhookRouter } from './routes/webhook';
+import { createSimulateRouter } from './routes/simulate';
 
 export { autopilotEmitter };
 
@@ -36,6 +37,7 @@ app.use('/api/export', createExportRouter());
 app.use('/api/autopilot', createAutopilotRouter());
 app.use('/api/audit', createAuditRouter());
 app.use('/api/webhook', createWebhookRouter(prisma, rzpClient, auditLogger));
+app.use('/api/simulate', createSimulateRouter(prisma, auditLogger));
 
 export function startServer(port: number = config.server.port) {
   return app.listen(port, () => {

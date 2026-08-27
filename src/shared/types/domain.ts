@@ -47,21 +47,54 @@ export interface Order {
   items: CartItem[];
 }
 
+export type OpportunityStatus = 'OPEN' | 'PURSUING' | 'RECOVERED' | 'EXPIRED' | 'CLOSED';
+
+export interface RecoveryOpportunity {
+  id: string;
+  customer_id: string;
+  idempotency_key: string;
+  type: 'FAILED_PAYMENT' | 'ABANDONED_CART' | 'UPSELL' | 'REENGAGEMENT';
+  source_type?: 'ORDER' | 'CART' | null;
+  source_id?: string | null;
+  strategy_key?: string | null;
+  estimated_value_paise: number;
+  value_is_estimated: boolean;
+  status: OpportunityStatus;
+  detected_at: string;
+  resolved_at?: string | null;
+}
+
 export type ActionType =
   | 'discounted_payment_link'
   | 'payment_reminder'
   | 'upsell_payment_link'
   | 'retry_payment_link';
 
+export type RecoveryOfferStatus =
+  | 'PENDING'
+  | 'ESCALATED'
+  | 'DISPATCHED'
+  | 'EXECUTION_FAILED'
+  | 'RECOVERED'
+  | 'EXPIRED';
+
+export type ExecutionMode = 'LIVE' | 'SIMULATED';
+
 export interface RecoveryOffer {
   id: string;
   customer_id: string;
+  opportunity_id?: string | null;
   action_type: ActionType;
   amount_paise: number;
   discount_percent: number;
-  status: 'pending' | 'sent' | 'redeemed' | 'expired';
+  status: RecoveryOfferStatus;
+  execution_mode?: ExecutionMode | null;
   created_at: string;
   expires_at: string;
-  razorpay_payment_link_id?: string;
-  razorpay_order_id?: string;
+  razorpay_payment_link_id?: string | null;
+  razorpay_order_id?: string | null;
+  opportunity_type?: string | null;
+  policy_verdict?: string | null;
+  ai_reason?: string | null;
+  ai_confidence_score?: number | null;
 }

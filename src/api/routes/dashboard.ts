@@ -9,7 +9,7 @@ export function createDashboardRouter(): Router {
 
   router.get('/summary', async (req: Request, res: Response) => {
     try {
-      const items = await getAllCurrentActions();
+      const items = await getAllCurrentActions().catch(() => []);
       const summary = await dashboardService.getSummary(items);
       res.json(summary);
     } catch (err: any) {

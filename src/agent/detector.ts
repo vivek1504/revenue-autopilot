@@ -4,6 +4,7 @@ import { Cart, Customer, Order, OpportunityType, RecoveryOffer, ActionType } fro
 export interface CustomerOpportunity {
   customer: Customer;
   opportunityType: OpportunityType;
+  opportunityId?: string;
   cart?: Cart;
   failedOrders: Order[];
   completedOrders: Order[];
@@ -26,6 +27,7 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
   };
 
   const now = new Date();
+  const currentWindow = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
   const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -38,7 +40,7 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
       customer: {
         recovery_offers: {
           none: {
-            status: { in: ['pending', 'sent'] },
+            status: { in: ['PENDING', 'DISPATCHED', 'pending', 'sent'] },
             expires_at: { gt: now },
           },
         },
@@ -52,6 +54,34 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
   for (const cartRow of abandonedCarts) {
     const customer = mapCustomer(cartRow.customer);
     if (processedCustomerIds.has(customer.id)) continue;
+
+    const idempotencyKey = `ABANDONED_CART:${cartRow.id}`;
+    let oppRecord = await prisma.recoveryOpportunity.findUnique({
+      where: { idempotency_key: idempotencyKey },
+    });
+
+    if (!oppRecord) {
+      try {
+        oppRecord = await prisma.recoveryOpportunity.create({
+          data: {
+            customer_id: customer.id,
+            idempotency_key: idempotencyKey,
+            type: 'ABANDONED_CART',
+            source_type: 'CART',
+            source_id: cartRow.id,
+            estimated_value_paise: cartRow.total_paise,
+            value_is_estimated: false,
+            status: 'OPEN',
+          },
+        });
+      } catch {
+        oppRecord = await prisma.recoveryOpportunity.findUnique({
+          where: { idempotency_key: idempotencyKey },
+        });
+      }
+    }
+
+    if (!oppRecord || oppRecord.status !== 'OPEN') continue;
 
     const cart: Cart = {
       id: cartRow.id,
@@ -70,6 +100,7 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
     opportunities.push({
       customer,
       opportunityType: 'abandoned_checkout',
+      opportunityId: oppRecord.id,
       cart,
       failedOrders,
       completedOrders,
@@ -86,7 +117,7 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
       customer: {
         recovery_offers: {
           none: {
-            status: { in: ['pending', 'sent'] },
+            status: { in: ['PENDING', 'DISPATCHED', 'pending', 'sent'] },
             expires_at: { gt: now },
           },
         },
@@ -101,6 +132,34 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
     const customer = mapCustomer(orderRow.customer);
     if (processedCustomerIds.has(customer.id)) continue;
 
+    const idempotencyKey = `FAILED_PAYMENT:${orderRow.id}`;
+    let oppRecord = await prisma.recoveryOpportunity.findUnique({
+      where: { idempotency_key: idempotencyKey },
+    });
+
+    if (!oppRecord) {
+      try {
+        oppRecord = await prisma.recoveryOpportunity.create({
+          data: {
+            customer_id: customer.id,
+            idempotency_key: idempotencyKey,
+            type: 'FAILED_PAYMENT',
+            source_type: 'ORDER',
+            source_id: orderRow.id,
+            estimated_value_paise: orderRow.total_paise,
+            value_is_estimated: false,
+            status: 'OPEN',
+          },
+        });
+      } catch {
+        oppRecord = await prisma.recoveryOpportunity.findUnique({
+          where: { idempotency_key: idempotencyKey },
+        });
+      }
+    }
+
+    if (!oppRecord || oppRecord.status !== 'OPEN') continue;
+
     const completedOrders = await getCompletedOrders(prisma, customer.id);
     const failedOrders = await getFailedOrders(prisma, customer.id);
     const existingOffers = await getExistingOffers(prisma, customer.id);
@@ -108,6 +167,7 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
     opportunities.push({
       customer,
       opportunityType: 'failed_payment',
+      opportunityId: oppRecord.id,
       failedOrders,
       completedOrders,
       existingOffers,
@@ -125,7 +185,7 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
       },
       recovery_offers: {
         none: {
-          status: { in: ['pending', 'sent'] },
+          status: { in: ['PENDING', 'DISPATCHED', 'pending', 'sent'] },
           expires_at: { gt: now },
         },
       },
@@ -136,6 +196,38 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
     const customer = mapCustomer(custRow);
     if (processedCustomerIds.has(customer.id)) continue;
 
+    const idempotencyKey = `UPSELL:${customer.id}:${currentWindow}`;
+    let oppRecord = await prisma.recoveryOpportunity.findUnique({
+      where: { idempotency_key: idempotencyKey },
+    });
+
+    if (!oppRecord) {
+      const completed = await getCompletedOrders(prisma, customer.id);
+      const estimatedValue = completed.length > 0
+        ? Math.round(completed[0]!.total_paise * 1.3)
+        : 499900;
+
+      try {
+        oppRecord = await prisma.recoveryOpportunity.create({
+          data: {
+            customer_id: customer.id,
+            idempotency_key: idempotencyKey,
+            type: 'UPSELL',
+            strategy_key: 'PREMIUM_UPSELL',
+            estimated_value_paise: estimatedValue,
+            value_is_estimated: true,
+            status: 'OPEN',
+          },
+        });
+      } catch {
+        oppRecord = await prisma.recoveryOpportunity.findUnique({
+          where: { idempotency_key: idempotencyKey },
+        });
+      }
+    }
+
+    if (!oppRecord || oppRecord.status !== 'OPEN') continue;
+
     const completedOrders = await getCompletedOrders(prisma, customer.id);
     const failedOrders = await getFailedOrders(prisma, customer.id);
     const existingOffers = await getExistingOffers(prisma, customer.id);
@@ -143,6 +235,7 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
     opportunities.push({
       customer,
       opportunityType: 'upsell',
+      opportunityId: oppRecord.id,
       failedOrders,
       completedOrders,
       existingOffers,
@@ -157,7 +250,7 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
       last_purchase_date: { lte: thirtyDaysAgo },
       recovery_offers: {
         none: {
-          status: { in: ['pending', 'sent'] },
+          status: { in: ['PENDING', 'DISPATCHED', 'pending', 'sent'] },
           expires_at: { gt: now },
         },
       },
@@ -168,6 +261,33 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
     const customer = mapCustomer(custRow);
     if (processedCustomerIds.has(customer.id)) continue;
 
+    const idempotencyKey = `REENGAGEMENT:${customer.id}:${currentWindow}`;
+    let oppRecord = await prisma.recoveryOpportunity.findUnique({
+      where: { idempotency_key: idempotencyKey },
+    });
+
+    if (!oppRecord) {
+      try {
+        oppRecord = await prisma.recoveryOpportunity.create({
+          data: {
+            customer_id: customer.id,
+            idempotency_key: idempotencyKey,
+            type: 'REENGAGEMENT',
+            strategy_key: 'WINBACK',
+            estimated_value_paise: 249900,
+            value_is_estimated: true,
+            status: 'OPEN',
+          },
+        });
+      } catch {
+        oppRecord = await prisma.recoveryOpportunity.findUnique({
+          where: { idempotency_key: idempotencyKey },
+        });
+      }
+    }
+
+    if (!oppRecord || oppRecord.status !== 'OPEN') continue;
+
     const completedOrders = await getCompletedOrders(prisma, customer.id);
     const failedOrders = await getFailedOrders(prisma, customer.id);
     const existingOffers = await getExistingOffers(prisma, customer.id);
@@ -175,6 +295,7 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
     opportunities.push({
       customer,
       opportunityType: 're_engagement',
+      opportunityId: oppRecord.id,
       failedOrders,
       completedOrders,
       existingOffers,

@@ -1,12 +1,20 @@
+import fs from 'fs';
 import { prisma } from '../src/api/dependencies';
 import { generateCustomers } from '../src/data/customers';
 import { generateOrdersAndCarts } from '../src/data/orders';
 import { PRODUCT_CATALOG } from '../src/data/products';
+import { config } from '../src/shared/config';
 
 async function seed() {
   console.log('🌱 Seeding synthetic merchant dataset into PostgreSQL via Prisma...\n');
 
+  // Clear audit log so audit verification starts clean
+  try {
+    fs.writeFileSync(config.auditPath, '');
+  } catch (e) {}
+
   await prisma.recoveryOffer.deleteMany({});
+  await prisma.recoveryOpportunity.deleteMany({});
   await prisma.cart.deleteMany({});
   await prisma.order.deleteMany({});
   await prisma.customer.deleteMany({});
@@ -79,7 +87,6 @@ async function seed() {
     completedOrders: await prisma.order.count({ where: { status: 'completed' } }),
     failedOrders: await prisma.order.count({ where: { status: 'failed' } }),
     abandonedCarts: await prisma.cart.count({ where: { status: 'abandoned' } }),
-    adversarialNotes: await prisma.customer.count({ where: { notes: { not: null } } }),
     vipCustomers: await prisma.customer.count({ where: { tier: 'vip' } }),
   };
 
@@ -90,7 +97,6 @@ async function seed() {
   console.log(` Total Orders:          ${stats.orders} (${stats.completedOrders} completed, ${stats.failedOrders} failed)`);
   console.log(` Abandoned Carts:       ${stats.abandonedCarts}`);
   console.log(` VIP Customers:         ${stats.vipCustomers}`);
-  console.log(` Adversarial Notes:     ${stats.adversarialNotes}`);
   console.log('========================================\n');
 
   await prisma.$disconnect();

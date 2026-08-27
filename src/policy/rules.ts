@@ -58,7 +58,7 @@ export const RULES: Record<string, RuleCheck> = {
     const existing = await prisma.recoveryOffer.findFirst({
       where: {
         customer_id: proposal.customer_id,
-        status: { in: ['pending', 'sent'] },
+        status: { in: ['PENDING', 'DISPATCHED', 'pending', 'sent'] },
         created_at: { gte: twentyFourHoursAgo },
       },
       select: { id: true, created_at: true },

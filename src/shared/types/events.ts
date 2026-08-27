@@ -6,6 +6,9 @@ export interface AutopilotResult {
   total_opportunities: number;
   approved_count: number;
   blocked_count: number;
+  escalated_count: number;
+  dispatched_count: number;
+  execution_failed_count: number;
   unsafe_value_blocked_paise: number;
   approved_value_paise: number;
   duration_ms: number;

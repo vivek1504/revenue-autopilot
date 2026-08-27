@@ -44,8 +44,8 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
   const avgConfidence =
     confidences.length > 0
       ? Math.round(
-          (confidences.reduce((a, b) => a + b, 0) / confidences.length) * 1000
-        ) / 10
+        (confidences.reduce((a, b) => a + b, 0) / confidences.length) * 1000
+      ) / 10
       : benchmarks?.avg_confidence || 0;
 
   // 2. Metrics from items
@@ -59,16 +59,11 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
 
   const auditRecordsCount = items.length;
 
-  const ruleCatchColors = [
-    'bg-rose-500',
-    'bg-indigo-600',
-    'bg-blue-600',
-    'bg-amber-500',
-    'bg-purple-600',
-  ];
-
   const ruleCatches = benchmarks?.rule_catches || [];
   const totalCatches = ruleCatches.reduce((acc, curr) => acc + curr.count, 0);
+
+  const lastModelName = items[items.length - 1]?.auditRecord?.llm_reasoning?.model || 'Gemini 3.6 Flash';
+  const isHeuristic = items[items.length - 1]?.auditRecord?.llm_reasoning?.used_fallback;
 
   return (
     <div className="space-y-8 font-sans">
@@ -79,10 +74,7 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
             <h1 className="text-3xl font-extrabold text-[#0b1c30] tracking-tight">
               Agent Telemetry & Safety Profiling
             </h1>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200 font-mono">
-              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-              Gemini 3.6 Flash Active
-            </span>
+
           </div>
           <p className="text-xs text-slate-500 mt-1">
             Real-time inference telemetry, deterministic guardrail catch distributions, and SHA-256 ledger integrity.
@@ -132,19 +124,19 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
         <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs">
           <div className="flex items-center justify-between text-slate-500 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider">
-              LLM Reasoning Time
+              Average LLM Reasoning Time
             </span>
             <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700">
               <Zap className="w-4 h-4" />
             </div>
           </div>
           <div className="text-2xl font-black font-tabular text-indigo-700 tracking-tight">
-            {benchmarks?.avg_llm_latency_ms
+            {benchmarks?.avg_llm_latency_ms != null
               ? `${benchmarks.avg_llm_latency_ms}ms`
               : '—'}
           </div>
           <div className="text-xs text-slate-500 mt-2">
-            P99 Latency: {benchmarks?.p99_llm_ms ? `${benchmarks.p99_llm_ms}ms` : '—'}
+            {isHeuristic ? "simulation time" : `Latency:${benchmarks?.p99_llm_ms != null ? `${benchmarks.p99_llm_ms}ms` : '—'}`}
           </div>
         </div>
 
@@ -159,11 +151,10 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
             </div>
           </div>
           <div
-            className={`text-xl font-black font-tabular tracking-tight ${
-              verificationResult && !verificationResult.valid
-                ? 'text-rose-700'
-                : 'text-emerald-700'
-            }`}
+            className={`text-xl font-black font-tabular tracking-tight ${verificationResult && !verificationResult.valid
+              ? 'text-rose-700'
+              : 'text-emerald-700'
+              }`}
           >
             {verificationResult && !verificationResult.valid
               ? 'Tamper Detected'
@@ -199,7 +190,7 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
                   Postgres Discovery Scan
                 </span>
                 <span className="font-mono font-bold text-slate-900">
-                  {benchmarks?.p99_discovery_ms
+                  {benchmarks?.p99_discovery_ms != null
                     ? `${benchmarks.p99_discovery_ms}ms (p99)`
                     : '—'}
                 </span>
@@ -209,8 +200,8 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
                 <span className="font-semibold text-slate-700">
                   Deterministic Policy Evaluation
                 </span>
-                <span className="font-mono font-bold text-emerald-700">
-                  {benchmarks?.p99_policy_ms
+                <span className="font-mono font-bold text-slate-900">
+                  {benchmarks?.p99_policy_ms != null
                     ? `${benchmarks.p99_policy_ms}ms (p99)`
                     : '—'}
                 </span>
@@ -221,7 +212,7 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
                   SHA-256 Hash Chain Ledger Append
                 </span>
                 <span className="font-mono font-bold text-slate-900">
-                  {benchmarks?.p99_ledger_ms
+                  {benchmarks?.p99_ledger_ms != null
                     ? `${benchmarks.p99_ledger_ms}ms (p99)`
                     : '—'}
                 </span>
@@ -229,22 +220,22 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
 
               <div className="p-3 bg-[#f8f9fa] border border-slate-200 rounded-md flex items-center justify-between text-xs">
                 <span className="font-semibold text-slate-700">
-                  Gemini 3.6 Flash Structured Output
+                  {lastModelName} Structured Output
                 </span>
-                <span className="font-mono font-bold text-blue-600">
-                  {benchmarks?.p99_llm_ms
+                <span className="font-mono font-bold text-slate-900">
+                  {benchmarks?.p99_llm_ms != null
                     ? `~${benchmarks.p99_llm_ms}ms (p99)`
                     : '—'}
                 </span>
               </div>
 
-              <div className="p-3.5 bg-slate-950 text-white rounded-md flex items-center justify-between text-xs font-bold shadow-xs">
-                <span className="text-slate-200">
+              <div className="p-3 bg-[#f8f9fa] border border-slate-200 rounded-md flex items-center justify-between text-xs">
+                <span className="font-semibold text-slate-700">
                   Autopilot Execution Throughput
                 </span>
-                <span className="font-mono text-emerald-400 text-sm">
-                  {benchmarks?.throughput_ops_sec
-                    ? `> ${benchmarks.throughput_ops_sec} ops/sec`
+                <span className="font-mono text-slate-900 font-bold">
+                  {benchmarks?.throughput_ops_sec != null
+                    ? `${benchmarks.throughput_ops_sec} ops/sec`
                     : 'Active'}
                 </span>
               </div>
@@ -264,12 +255,12 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-500 mb-5">
-              Live breakdown of deterministic rules triggered from actual evaluated proposals.
+              Deterministic rules triggered from actual evaluated proposals. Each proposal can trigger multiple rules.
             </p>
 
             <div className="space-y-4">
               {ruleCatches.map((ruleItem, i) => {
-                const barColor = ruleCatchColors[i % ruleCatchColors.length] || 'bg-blue-600';
+                const barColor = 'bg-rose-600';
                 return (
                   <div
                     key={i}
@@ -369,11 +360,10 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
                       </td>
                       <td className="py-3.5 px-6">
                         <span
-                          className={`inline-flex items-center gap-1 text-[10px] font-bold font-mono uppercase px-2 py-0.5 rounded border ${
-                            isApproved
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : 'bg-rose-50 text-rose-700 border-rose-200'
-                          }`}
+                          className={`inline-flex items-center gap-1 text-[10px] font-bold font-mono uppercase px-2 py-0.5 rounded border ${isApproved
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                            }`}
                         >
                           {isApproved ? (
                             <CheckCircle2 className="w-3 h-3 text-emerald-600" />

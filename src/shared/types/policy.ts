@@ -1,6 +1,6 @@
 import { AgentProposal } from './agent';
 
-export type PolicyVerdict = 'APPROVED' | 'BLOCKED';
+export type PolicyVerdict = 'APPROVED' | 'BLOCKED' | 'ESCALATED';
 
 export interface PolicyViolation {
   rule: string;

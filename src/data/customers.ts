@@ -1,5 +1,4 @@
 import { Customer } from '../shared/types';
-import { ADVERSARIAL_NOTES } from './adversarial';
 
 const FIRST_NAMES = [
   'Ananya', 'Rahul', 'Priya', 'Rohan', 'Sneha', 'Vikram', 'Neha', 'Arjun',
@@ -24,7 +23,7 @@ export interface CustomerWithScenario extends Customer {
     | 'recent_buyer'
     | 'low_value'
     | 'vip'
-    | 'adversarial'
+    | 'high_value'
     | 'edge_case';
 }
 
@@ -39,7 +38,7 @@ export function generateCustomers(count: number = 120): CustomerWithScenario[] {
   // 81 - 90: recent_buyer
   // 91 - 100: low_value
   // 101 - 110: vip
-  // 111 - 115: adversarial
+  // 111 - 115: high_value
   // 116 - 120: edge_case
 
   for (let i = 1; i <= count; i++) {
@@ -87,10 +86,10 @@ export function generateCustomers(count: number = 120): CustomerWithScenario[] {
       totalOrders = Math.floor(Math.random() * 10) + 8;
       lifetimeSpendPaise = (Math.floor(Math.random() * 30000) + 50000) * 100; // ₹50,000+
     } else if (i <= 115) {
-      scenario = 'adversarial';
-      totalOrders = 2;
-      lifetimeSpendPaise = 450000; // ₹4,500
-      notes = ADVERSARIAL_NOTES[(i - 111) % ADVERSARIAL_NOTES.length];
+      scenario = 'high_value';
+      tier = 'premium';
+      totalOrders = 5;
+      lifetimeSpendPaise = 3500000; // ₹35,000
     } else {
       scenario = 'edge_case';
       totalOrders = 0;
