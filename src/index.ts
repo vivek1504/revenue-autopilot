@@ -11,7 +11,7 @@ if (require.main === module) {
       console.log(`- Total Opportunities Processed: ${result.total_opportunities}`);
       console.log(`- Policy Approved Actions: ${result.approved_count}`);
       console.log(`- Policy Blocked Violations: ${result.blocked_count}`);
-      console.log(`- Revenue Protected (Blocked Unsafe Value): ₹${(result.unsafe_value_blocked_paise / 100).toLocaleString('en-IN')}`);
+      console.log(`- Unsafe Value Blocked: ₹${(result.unsafe_value_blocked_paise / 100).toLocaleString('en-IN')}`);
       console.log(`- Revenue Recoverable (Approved Value): ₹${(result.approved_value_paise / 100).toLocaleString('en-IN')}`);
     })
     .catch((err) => {
