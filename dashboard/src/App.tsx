@@ -27,6 +27,7 @@ export function App() {
     run,
     runVerification,
     tamperRecord,
+    simulatePayment,
     saveSettings,
     exportReport,
   } = useAutopilot();
@@ -104,6 +105,7 @@ export function App() {
                 items={processedActions}
                 summary={summary}
                 onSelectVerdict={(item) => setSelectedVerdictItem(item)}
+                onSimulatePayment={simulatePayment}
               />
             )}
 
