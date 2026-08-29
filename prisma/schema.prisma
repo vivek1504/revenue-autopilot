@@ -102,6 +102,13 @@ model RecoveryOffer {
   customer_id              String
   opportunity_id           String?
   action_type              String
+  /// Gross monetary value associated with the proposed recovery action, before any discount.
+  /// For FAILED_PAYMENT and ABANDONED_CART: the original order/cart value.
+  /// For UPSELL: the proposed upsell product value.
+  /// For REENGAGEMENT: the estimated re-engagement incentive value.
+  /// Settled value = amount_paise * (1 - discount_percent / 100).
+  /// When the parent RecoveryOpportunity has value_is_estimated = true,
+  /// this value represents potential opportunity rather than actual revenue at risk.
   amount_paise             Int
   discount_percent         Float                @default(0)
   status                   String               @default("PENDING")

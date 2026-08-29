@@ -23,7 +23,7 @@ export function createSimulateRouter(
     const updateResult = await prisma.recoveryOffer.updateMany({
       where: {
         id: offer_id,
-        status: { in: ['DISPATCHED', 'sent', 'simulated'] },
+        status: 'DISPATCHED',
       },
       data: { status: 'RECOVERED' },
     });
@@ -70,7 +70,7 @@ export function createSimulateRouter(
       action: offer.action_type as any,
       amount_paise: discountedAmount,
       discount_percent: offer.discount_percent,
-      expiry_hours: 24,
+      expiry_hours: 0,
       reason: "Simulated payment settlement verified for offer " + offer.id,
       opportunity_type: (offer.opportunity_type as any) || "abandoned_checkout",
       evidence: {},
