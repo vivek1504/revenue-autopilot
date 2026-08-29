@@ -31,6 +31,6 @@ export interface ProcessedAction {
   proposal: AgentProposal;
   verdict: PolicyResult;
   execution?: ExecutionResult;
-  auditRecord: AuditRecord;
+  auditRecord?: AuditRecord;
   customerName?: string;
 }
