@@ -7,8 +7,8 @@ async function verifyDemo() {
   console.log('🔍 REVENUE AUTOPILOT — VERIFY RECOVERED MONEY & AUDIT TRAIL');
   console.log('================================================================\n');
 
-  const redeemedOffers = await prisma.recoveryOffer.findMany({
-    where: { status: 'redeemed' },
+  const recoveredOffers = await prisma.recoveryOffer.findMany({
+    where: { status: 'RECOVERED' },
     include: { customer: true },
   });
 
@@ -16,18 +16,18 @@ async function verifyDemo() {
     include: { customer: true },
   });
 
-  const totalRecoveredPaise = redeemedOffers.reduce((sum, o) => {
+  const totalRecoveredPaise = recoveredOffers.reduce((sum, o) => {
     const discounted = Math.round(o.amount_paise * (1 - (o.discount_percent || 0) / 100));
     return sum + discounted;
   }, 0);
 
-  console.log(`📋 Total Recovery Offers Sent:    ${allOffers.length}`);
-  console.log(`✅ Webhook Verified Paid Offers:  ${redeemedOffers.length}`);
-  console.log(`💰 Measured Money Recovered:      ₹${(totalRecoveredPaise / 100).toLocaleString('en-IN')}\n`);
+  console.log(`📋 Total Recovery Offers Generated: ${allOffers.length}`);
+  console.log(`✅ Webhook Verified Paid Offers:    ${recoveredOffers.length}`);
+  console.log(`💰 Measured Money Recovered:        ₹${(totalRecoveredPaise / 100).toLocaleString('en-IN')}\n`);
 
-  if (redeemedOffers.length > 0) {
+  if (recoveredOffers.length > 0) {
     console.log('🎉 Confirmed Paid Recoveries:');
-    redeemedOffers.forEach((o) => {
+    recoveredOffers.forEach((o) => {
       const net = Math.round(o.amount_paise * (1 - o.discount_percent / 100));
       console.log(`  • Customer: ${o.customer.name} (${o.customer.id})`);
       console.log(`    Original: ₹${(o.amount_paise / 100).toLocaleString('en-IN')} | Discount: ${o.discount_percent}%`);
