@@ -85,6 +85,17 @@ export function createWebhookRouter(
           .json({ status: 'ok', event, note: 'No payment_link_id to match' });
       }
 
+      const existingOffer = await prisma.recoveryOffer.findUnique({
+        where: { razorpay_payment_link_id: paymentLinkId }
+      });
+
+      if (!existingOffer || existingOffer.status !== 'DISPATCHED') {
+        return res.status(200).json({ status: 'ok', event, note: 'Offer not found or not DISPATCHED' });
+      }
+
+      const paymentActualAmount = payload.payload?.payment?.entity?.amount || paymentEntity?.amount_paid || paymentEntity?.amount;
+      const settledAmount = paymentActualAmount || Math.round(existingOffer.amount_paise * (1 - (existingOffer.discount_percent || 0) / 100));
+
       // Atomic conditional update on exact payment_link_id
       const updateResult = await prisma.recoveryOffer.updateMany({
         where: {
@@ -94,6 +105,7 @@ export function createWebhookRouter(
         data: {
           status: 'RECOVERED',
           recovered_at: new Date(),
+          settled_amount_paise: settledAmount,
         },
       });
 
@@ -106,6 +118,7 @@ export function createWebhookRouter(
             customer_id: true,
             amount_paise: true,
             discount_percent: true,
+            settled_amount_paise: true,
             action_type: true,
             opportunity_type: true,
           },
@@ -125,14 +138,14 @@ export function createWebhookRouter(
         const settledOffer = settledOffers[0];
         const targetCustomerId = settledOffer?.customer_id || customerId;
         if (targetCustomerId && settledOffer) {
-          const settledAmount = paymentEntity?.amount ||
+          const finalSettledAmount = settledOffer.settled_amount_paise ||
             Math.round(settledOffer.amount_paise * (1 - (settledOffer.discount_percent || 0) / 100));
 
           auditLogger.appendSettlement({
             offer_id: settledOffer.id,
             opportunity_id: settledOffer.opportunity_id || undefined,
             payment_link_id: paymentLinkId,
-            settled_amount_paise: settledAmount,
+            settled_amount_paise: finalSettledAmount,
             customer_id: targetCustomerId,
             action_type: settledOffer.action_type,
             opportunity_type: settledOffer.opportunity_type || 'abandoned_checkout',

@@ -21,6 +21,7 @@ export class AnalyticsService {
         created_at: true,
         amount_paise: true,
         discount_percent: true,
+        settled_amount_paise: true,
       },
       orderBy: { created_at: 'asc' },
     });
@@ -31,7 +32,7 @@ export class AnalyticsService {
 
     const pointsMap = new Map<
       string,
-      { label: string; recoverable_paise: number; recovered_paise: number }
+      { label: string; opportunity_value_paise: number; recovered_paise: number }
     >();
 
     for (const opp of opportunities) {
@@ -43,11 +44,11 @@ export class AnalyticsService {
 
       const current = pointsMap.get(dateKey) || {
         label,
-        recoverable_paise: 0,
+        opportunity_value_paise: 0,
         recovered_paise: 0,
       };
 
-      current.recoverable_paise += opp.estimated_value_paise;
+      current.opportunity_value_paise += opp.estimated_value_paise;
       pointsMap.set(dateKey, current);
     }
 
@@ -61,11 +62,11 @@ export class AnalyticsService {
 
       const current = pointsMap.get(dateKey) || {
         label,
-        recoverable_paise: 0,
+        opportunity_value_paise: 0,
         recovered_paise: 0,
       };
 
-      const discounted = Math.round(
+      const discounted = offer.settled_amount_paise ?? Math.round(
         offer.amount_paise * (1 - (offer.discount_percent || 0) / 100)
       );
       current.recovered_paise += discounted;
@@ -76,7 +77,7 @@ export class AnalyticsService {
     return entries.map(([period, data]) => ({
       period,
       label: data.label,
-      recoverable_paise: data.recoverable_paise,
+      opportunity_value_paise: data.opportunity_value_paise,
       recovered_paise: data.recovered_paise,
     }));
   }

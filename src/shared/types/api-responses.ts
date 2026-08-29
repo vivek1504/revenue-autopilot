@@ -42,7 +42,7 @@ export interface CohortPerformance {
 export interface TimeSeriesPoint {
   period: string;
   label: string;
-  recoverable_paise: number;
+  opportunity_value_paise: number;
   recovered_paise: number;
 }
 

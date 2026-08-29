@@ -82,7 +82,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
     timeseries && timeseries.length > 0 ? timeseries : [];
 
   const maxVolume = Math.max(
-    ...chartPoints.map((p) => p.recoverable_paise),
+    ...chartPoints.map((p) => p.opportunity_value_paise),
     100000
   );
 
@@ -270,7 +270,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
                   {chartPoints.map((pt, idx) => {
                     const hPercentRec = Math.min(
                       100,
-                      Math.max(12, Math.round((pt.recoverable_paise / maxVolume) * 100))
+                      Math.max(12, Math.round((pt.opportunity_value_paise / maxVolume) * 100))
                     );
                     const hPercentApp = Math.min(
                       100,
@@ -289,7 +289,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
                             className="w-1/2 max-w-[32px] bg-blue-500/80 hover:bg-blue-600 rounded-t transition-all duration-300 relative"
                           >
                             <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] px-2 py-0.5 rounded font-mono font-bold whitespace-nowrap pointer-events-none transition-opacity z-10">
-                              {formatCompact(pt.recoverable_paise)}
+                              {formatCompact(pt.opportunity_value_paise)}
                             </div>
                           </div>
                           {/* Recovered Bar */}
@@ -317,11 +317,11 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-xs bg-blue-500"></span>
-                Opportunities Identified
+                Opportunity Value Identified
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-xs bg-emerald-500"></span>
-                Settled Recoveries
+                Recovered Revenue
               </span>
             </div>
             <span className="font-mono text-[11px] text-slate-400">
