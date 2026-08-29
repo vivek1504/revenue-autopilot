@@ -268,12 +268,12 @@ export function useAutopilot() {
   );
 
   const resolveEscalation = useCallback(
-    async (offerId: string, decision: 'APPROVED' | 'REJECTED') => {
+    async (offerId: string, decision: 'APPROVED' | 'REJECTED', mode: 'live' | 'simulated') => {
       try {
         const res = await fetch(`/api/opportunities/${offerId}/resolve`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ decision }),
+          body: JSON.stringify({ decision, mode }),
         });
         if (res.ok) {
           await refreshAll();

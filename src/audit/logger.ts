@@ -52,6 +52,7 @@ export class AuditLogger {
     executionResult?: ExecutionResult,
     llmReasoning?: LLMReasoningMetadata
   ): AuditRecord {
+    this.loadState();
     const recordWithoutHash: Omit<AuditRecord, 'record_hash'> = {
       sequence: this.sequence + 1,
       timestamp: new Date().toISOString(),
@@ -84,6 +85,20 @@ export class AuditLogger {
     return fullRecord;
   }
 
+  public appendAction(action: {
+    proposal: AgentProposal;
+    verdict: PolicyResult;
+    execution?: ExecutionResult;
+    llmReasoning?: LLMReasoningMetadata;
+  }): AuditRecord {
+    return this.append(
+      action.proposal,
+      action.verdict,
+      action.execution,
+      action.llmReasoning
+    );
+  }
+
   public appendSettlement(settlement: {
     offer_id: string;
     opportunity_id?: string;
@@ -95,6 +110,7 @@ export class AuditLogger {
     discount_percent: number;
     mode?: 'live' | 'simulated';
   }): AuditRecord {
+    this.loadState();
     const settlementProposal: AgentProposal = {
       customer_id: settlement.customer_id,
       action: settlement.action_type as any,
@@ -188,5 +204,19 @@ export class AuditLogger {
 
   public getSequence(): number {
     return this.sequence;
+  }
+
+  public getRecords(): AuditRecord[] {
+    if (!fs.existsSync(this.auditPath)) return [];
+    try {
+      const content = fs.readFileSync(this.auditPath, 'utf-8');
+      return content
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line));
+    } catch {
+      return [];
+    }
   }
 }

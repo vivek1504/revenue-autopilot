@@ -22,7 +22,7 @@ export class SettingsService {
       max_discount_percent: settingsMap.max_discount_percent ?? 15,
       max_expiry_hours: settingsMap.max_expiry_hours ?? 72,
       high_value_threshold_paise: settingsMap.high_value_threshold_paise ?? 2500000,
-      max_automated_amount_paise: settingsMap.max_automated_amount_paise ?? 1000000,
+      max_automated_amount_paise: settingsMap.max_automated_amount_paise ?? 10000000,
       max_contacts_per_week: settingsMap.max_contacts_per_week ?? 3,
       min_confidence_score: settingsMap.min_confidence_score ?? 0.70,
     };

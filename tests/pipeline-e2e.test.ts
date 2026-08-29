@@ -65,7 +65,7 @@ describe('End-to-End Pipeline Integration (Detect -> Reason -> Policy -> Execute
         id: 'cart_e2e_excess',
         customer_id: 'cust_e2e_excess',
         items: [] as any,
-        total_paise: 5000000, // ₹50,000 (exceeds ₹10,000 limit)
+        total_paise: 15000000, // ₹1,50,000 (exceeds ₹1,00,000 hard ceiling)
         created_at: twoHoursAgo,
         last_activity: twoHoursAgo,
         status: 'abandoned',

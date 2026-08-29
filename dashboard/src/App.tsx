@@ -133,8 +133,8 @@ export function App() {
       <PolicyVerdictModal
         item={selectedVerdictItem}
         onClose={() => setSelectedVerdictItem(null)}
-        onApprove={(id) => resolveEscalation(id, 'APPROVED')}
-        onReject={(id) => resolveEscalation(id, 'REJECTED')}
+        onApprove={(id) => resolveEscalation(id, 'APPROVED', executionMode)}
+        onReject={(id) => resolveEscalation(id, 'REJECTED', executionMode)}
       />
     </div>
   );

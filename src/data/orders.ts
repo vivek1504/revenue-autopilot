@@ -117,6 +117,25 @@ export function generateOrdersAndCarts(
         last_activity: new Date(now.getTime() - hoursAgo * 3600000).toISOString(),
         status: 'abandoned',
       });
+    } else if (scenario === 'high_value') {
+      // High-value cart in the ₹25k - ₹60k range (Escalation Zone)
+      const hoursAgo = Math.floor(Math.random() * 24) + 1;
+      const watch = products.find((p) => p.id === 'prod_041') || products[0]!;
+      const headphones = products.find((p) => p.id === 'prod_001') || products[0]!;
+      const totalPaise = 3500000; // ₹35,000
+
+      carts.push({
+        id: `cart_${String(cartCounter++).padStart(4, '0')}`,
+        customer_id: customerId,
+        items: [
+          { product_id: watch.id, quantity: 1, price_paise: 2999900 },
+          { product_id: headphones.id, quantity: 1, price_paise: 500100 },
+        ],
+        total_paise: totalPaise,
+        created_at: new Date(now.getTime() - (hoursAgo + 1) * 3600000).toISOString(),
+        last_activity: new Date(now.getTime() - hoursAgo * 3600000).toISOString(),
+        status: 'abandoned',
+      });
     }
   }
 

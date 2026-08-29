@@ -173,10 +173,10 @@ async function seedSmall() {
   console.log('========================================');
   console.log('📊 CURATED DEMO DATASET (4 OPPORTUNITIES)');
   console.log('========================================');
-  console.log(' 1. Ananya Sharma   -> Abandoned Checkout (₹8,500)   [Target: APPROVED -> Live Link]');
-  console.log(' 2. Vikram Malhotra -> Failed UPI Payment (₹6,500)    [Target: APPROVED -> Live Link]');
-  console.log(' 3. Priya Patel     -> VIP Upsell (₹9,500)           [Target: APPROVED -> Live Link]');
-  console.log(' 4. Rahul Verma     -> High-Value Cart (₹35,000)     [Target: BLOCKED by Policy (amount_limit)]');
+  console.log(' 1. Ananya Sharma   -> Abandoned Checkout (₹8,500)   [Target: APPROVED -> Auto Dispatched]');
+  console.log(' 2. Vikram Malhotra -> Failed UPI Payment (₹6,500)    [Target: APPROVED -> Auto Dispatched]');
+  console.log(' 3. Priya Patel     -> VIP Upsell (₹9,500)           [Target: APPROVED -> Auto Dispatched]');
+  console.log(' 4. Rahul Verma     -> High-Value Cart (₹35,000)     [Target: ESCALATED -> Human Approval Required]');
   console.log('========================================\n');
 
   await prisma.$disconnect();

@@ -133,7 +133,7 @@ describe('PolicyEngine Stopping Rules & Escalation Gates', () => {
     const overLimitProposal: AgentProposal = {
       customer_id: 'cust_stop_01',
       action: 'discounted_payment_link',
-      amount_paise: 3000000, // ₹30,000 (exceeds default ₹10,000 amount limit AND ₹25,000 escalation)
+      amount_paise: 15000000, // ₹1,50,000 (exceeds ₹1,00,000 hard ceiling AND ₹25,000 escalation)
       discount_percent: 5,
       expiry_hours: 24,
       confidence_score: 0.95,
