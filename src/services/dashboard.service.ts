@@ -42,14 +42,10 @@ export class DashboardService {
     });
 
     const approvedOffers = allOffers.filter(
-      (o) =>
-        o.policy_verdict === 'APPROVED' ||
-        o.status === 'DISPATCHED' ||
-        o.status === 'RECOVERED' ||
-        o.status === 'EXECUTION_FAILED'
+      (o) => o.policy_verdict === 'APPROVED'
     );
     const escalatedOffers = allOffers.filter(
-      (o) => o.status === 'ESCALATED' || o.policy_verdict === 'ESCALATED'
+      (o) => o.policy_verdict === 'ESCALATED'
     );
     const dispatchedOffers = allOffers.filter(
       (o) =>
@@ -61,7 +57,7 @@ export class DashboardService {
       (o) => o.status === 'RECOVERED'
     );
     const blockedOffers = allOffers.filter(
-      (o) => o.policy_verdict === 'BLOCKED' || o.status === 'BLOCKED'
+      (o) => o.policy_verdict === 'BLOCKED'
     );
 
     const approvedCount = approvedOffers.length;
