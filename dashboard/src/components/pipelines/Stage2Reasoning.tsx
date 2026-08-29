@@ -1,7 +1,8 @@
 import React from 'react';
-import { Brain } from 'lucide-react';
+import { Brain, Sparkles, ArrowRight } from 'lucide-react';
 import { ProcessedAction } from '../../types';
 import { cn } from '@/lib/utils';
+import { EmptyState } from '../ui/EmptyState';
 
 interface Stage2ReasoningProps {
   items: ProcessedAction[];
@@ -12,130 +13,162 @@ export const Stage2Reasoning: React.FC<Stage2ReasoningProps> = ({
   items,
   onSelectVerdict,
 }) => {
+  const avgDiscount =
+    items.length > 0
+      ? (items.reduce((a, b) => a + (b.proposal.discount_percent || 0), 0) / items.length).toFixed(1)
+      : '8.2';
+
   return (
     <div className="space-y-6 animate-fadeIn">
-      <div className="bg-white border border-slate-200/90 rounded-xl p-6 shadow-2xs space-y-4">
+      {/* 1. Header Card */}
+      <div className="bg-white border border-slate-200/90 rounded-xl p-6 shadow-[0_1px_3px_0_rgba(15,23,42,0.03)] space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700 shadow-2xs">
               <Brain className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900">
+              <h3 className="text-base font-bold text-slate-900 tracking-tight">
                 Stage 2: Generative AI Reasoning & Structured JSON Proposals
               </h3>
-              <p className="text-xs text-slate-500">
-                Gemini 3.6 Flash analyzes customer churn signals to synthesize customized discount incentives and recovery actions.
+              <p className="text-xs text-slate-500 mt-0.5">
+                Gemini 3.6 Flash evaluates customer churn signals and past payment history to formulate customized recovery offers.
               </p>
             </div>
           </div>
-          <span className="text-xs font-bold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-md border border-blue-200">
-            Model: Gemini 3.6 Flash (JSON Schema Enforced)
+          <span className="text-xs font-bold text-blue-800 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 font-mono flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+            Gemini 3.6 Flash · JSON Schema
           </span>
         </div>
 
+        {/* 3 Metric Tiles */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
-          <div className="p-4 bg-[#f8f9fa] border border-slate-200 rounded-lg">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Proposals Synthesized</span>
-            <div className="text-2xl font-bold font-tabular text-slate-900 mt-1">{items.length}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">100% structured JSON fidelity</div>
+          <div className="p-4 bg-slate-50/80 border border-slate-200/80 rounded-xl">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">
+              Proposals Synthesized
+            </span>
+            <div className="text-2xl font-extrabold font-tabular text-[#091e42] mt-1">{items.length}</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">100% structured JSON schema compliance</div>
           </div>
 
-          <div className="p-4 bg-[#f8f9fa] border border-slate-200 rounded-lg">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Avg Proposed Discount</span>
-            <div className="text-2xl font-bold font-tabular text-slate-900 mt-1">
-              {items.length > 0
-                ? `${(items.reduce((a, b) => a + (b.proposal.discount_percent || 0), 0) / items.length).toFixed(1)}%`
-                : '8.2%'}
+          <div className="p-4 bg-slate-50/80 border border-slate-200/80 rounded-xl">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">
+              Avg Proposed Discount
+            </span>
+            <div className="text-2xl font-extrabold font-tabular text-[#091e42] mt-1">
+              {avgDiscount}%
             </div>
-            <div className="text-[11px] text-slate-500 mt-0.5">Pre-policy model proposal</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">Pre-policy model incentive recommendation</div>
           </div>
 
-          <div className="p-4 bg-[#f8f9fa] border border-slate-200 rounded-lg">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Avg LLM Latency</span>
-            <div className="text-2xl font-bold font-tabular text-slate-900 mt-1">~140ms</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">Structured JSON response time</div>
+          <div className="p-4 bg-slate-50/80 border border-slate-200/80 rounded-xl">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">
+              Avg LLM Latency
+            </span>
+            <div className="text-2xl font-extrabold font-tabular text-[#091e42] mt-1">~140ms</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">Structured inference turn-around time</div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200/90 rounded-xl overflow-hidden shadow-2xs">
-        <div className="p-5 border-b border-slate-200 bg-[#f8f9fa] flex items-center justify-between">
+      {/* 2. Proposals Table */}
+      <div className="bg-white border border-slate-200/90 rounded-xl overflow-hidden shadow-[0_1px_3px_0_rgba(15,23,42,0.03)]">
+        <div className="p-5 border-b border-slate-200/80 bg-white flex items-center justify-between">
           <div>
             <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
               AI Proposal Syntheses & Justification Log
             </h4>
             <p className="text-xs text-slate-500 mt-0.5">
-              Actionable strategies generated by the autonomous reasoning agent
+              Actionable recovery strategies generated by the autonomous reasoning engine.
             </p>
           </div>
-          <span className="text-xs font-semibold px-2.5 py-1 bg-white border border-slate-200 rounded text-slate-700 font-mono">
-            {items.length} Proposals
+          <span className="text-xs font-semibold px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-mono">
+            {items.length} Structured Proposals
           </span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-[#e4edff] border-b border-slate-200 text-slate-600 font-bold uppercase text-[11px] tracking-wider">
+            <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase text-[11px] tracking-wider">
               <tr>
                 <th className="py-3 px-6">Customer</th>
-                <th className="py-3 px-6">Proposed Recovery Action</th>
+                <th className="py-3 px-6">Proposed Action</th>
                 <th className="py-3 px-6">AI Confidence</th>
-                <th className="py-3 px-6">Incentive Offer</th>
-                <th className="py-3 px-6">Generative Reasoning & Rationale</th>
+                <th className="py-3 px-6">Incentive</th>
+                <th className="py-3 px-6">Generative Reasoning & Evidence</th>
                 <th className="py-3 px-6 text-right">Inspect</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-sans">
-              {items.map((item, idx) => {
-                const conf = item.proposal.confidence_score
-                  ? Math.round(item.proposal.confidence_score * 100)
-                  : 92;
+              {items.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                    <EmptyState
+                      title="No proposals synthesized"
+                      description="Run an autopilot scan to synthesize structured JSON proposals."
+                    />
+                  </td>
+                </tr>
+              ) : (
+                items.map((item, idx) => {
+                  const conf = item.proposal.confidence_score
+                    ? Math.round(item.proposal.confidence_score * 100)
+                    : 92;
 
-                return (
-                  <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3.5 px-6 font-bold text-slate-900">
-                      <div>{item.customerName || item.proposal.customer_id}</div>
-                      <div className="text-[10px] font-mono text-slate-400">{item.proposal.customer_id}</div>
-                    </td>
-                    <td className="py-3.5 px-6 font-semibold text-slate-800">
-                      <div className="capitalize">{item.proposal.action.replace(/_/g, ' ')}</div>
-                      <div className="text-[11px] text-slate-400 font-mono">{item.proposal.expiry_hours}h expiry</div>
-                    </td>
-                    <td className="py-3.5 px-6">
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-blue-600 rounded-full" style={{ width: `${conf}%` }}></div>
+                  return (
+                    <tr key={idx} className="hover:bg-slate-50/80 transition-colors group">
+                      <td className="py-3.5 px-6 font-bold text-slate-900">
+                        <div className="group-hover:text-blue-600 transition-colors">
+                          {item.customerName || item.proposal.customer_id}
                         </div>
-                        <span className="font-bold font-tabular text-slate-900">{conf}%</span>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-6">
-                      <span className={cn(
-                        "px-2 py-0.5 rounded font-bold font-mono text-[11px]",
-                        item.proposal.discount_percent > 15
-                          ? "bg-rose-100 text-rose-800 border border-rose-200"
-                          : item.proposal.discount_percent > 0
-                          ? "bg-blue-50 text-blue-700 border border-blue-200"
-                          : "bg-slate-100 text-slate-700"
-                      )}>
-                        {item.proposal.discount_percent}% off
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-6 text-slate-600 italic max-w-xs truncate">
-                      "{item.proposal.reason}"
-                    </td>
-                    <td className="py-3.5 px-6 text-right">
-                      <button
-                        onClick={() => onSelectVerdict(item)}
-                        className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-[11px] transition-colors cursor-pointer"
-                      >
-                        View Prompt
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+                        <div className="text-[10px] font-mono text-slate-400">{item.proposal.customer_id}</div>
+                      </td>
+                      <td className="py-3.5 px-6 font-semibold text-slate-800">
+                        <div className="capitalize">{item.proposal.action.replace(/_/g, ' ')}</div>
+                        <div className="text-[11px] text-slate-400 font-mono">{item.proposal.expiry_hours}h validity</div>
+                      </td>
+                      <td className="py-3.5 px-6">
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-blue-600 rounded-full transition-all duration-300"
+                              style={{ width: `${conf}%` }}
+                            />
+                          </div>
+                          <span className="font-bold font-tabular font-mono text-slate-900">{conf}%</span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-6">
+                        <span
+                          className={cn(
+                            'px-2 py-0.5 rounded-md font-bold font-mono text-[11px] border inline-block',
+                            item.proposal.discount_percent > 15
+                              ? 'bg-rose-50 text-rose-800 border-rose-200'
+                              : item.proposal.discount_percent > 0
+                              ? 'bg-blue-50 text-blue-800 border-blue-200'
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
+                          )}
+                        >
+                          {item.proposal.discount_percent}% off
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-6 text-slate-600 italic max-w-xs truncate text-[11px]">
+                        &ldquo;{item.proposal.reason}&rdquo;
+                      </td>
+                      <td className="py-3.5 px-6 text-right">
+                        <button
+                          onClick={() => onSelectVerdict(item)}
+                          className="px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-[11px] transition-colors cursor-pointer inline-flex items-center gap-1"
+                        >
+                          <span>Inspect</span>
+                          <ArrowRight className="w-3 h-3 text-slate-400" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
