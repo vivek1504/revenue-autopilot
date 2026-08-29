@@ -46,10 +46,7 @@ export class DashboardService {
         o.policy_verdict === 'APPROVED' ||
         o.status === 'DISPATCHED' ||
         o.status === 'RECOVERED' ||
-        o.status === 'EXECUTION_FAILED' ||
-        o.status === 'sent' ||
-        o.status === 'redeemed' ||
-        o.status === 'simulated'
+        o.status === 'EXECUTION_FAILED'
     );
     const escalatedOffers = allOffers.filter(
       (o) => o.status === 'ESCALATED' || o.policy_verdict === 'ESCALATED'
@@ -58,13 +55,10 @@ export class DashboardService {
       (o) =>
         o.status === 'DISPATCHED' ||
         o.status === 'RECOVERED' ||
-        o.status === 'EXPIRED' ||
-        o.status === 'sent' ||
-        o.status === 'redeemed' ||
-        o.status === 'simulated'
+        o.status === 'EXPIRED'
     );
     const recoveredOffers = allOffers.filter(
-      (o) => o.status === 'RECOVERED' || o.status === 'redeemed'
+      (o) => o.status === 'RECOVERED'
     );
     const blockedOffers = allOffers.filter(
       (o) => o.policy_verdict === 'BLOCKED' || o.status === 'BLOCKED'

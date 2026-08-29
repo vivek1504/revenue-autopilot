@@ -92,18 +92,7 @@ export const RecoveriesAnalyticsView: React.FC<
   const recoveredPaise = summary?.recovered_value_paise || 0;
 
   const chartPoints: TimeSeriesPoint[] =
-    timeseries && timeseries.length > 0
-      ? timeseries
-      : totalRecPaise > 0 || approvedPaise > 0
-      ? [
-          {
-            period: 'Current Run',
-            label: 'Current Run',
-            recoverable_paise: totalRecPaise,
-            recovered_paise: recoveredPaise,
-          },
-        ]
-      : [];
+    timeseries && timeseries.length > 0 ? timeseries : [];
 
   const maxVolume = Math.max(
     ...chartPoints.map((p) => p.recoverable_paise),
@@ -192,7 +181,7 @@ export const RecoveriesAnalyticsView: React.FC<
 
         <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs">
           <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-            Revenue Protected
+            Unsafe Value Blocked
           </div>
           <div className="text-2xl font-black font-tabular text-rose-700">
             {formatRupees(summary?.unsafe_value_blocked_paise || 0)}
@@ -223,7 +212,7 @@ export const RecoveriesAnalyticsView: React.FC<
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-base font-bold text-slate-900">
-                  Recovery Volume by Run Period
+                  Recovery Performance Over Time
                 </h3>
                 <p className="text-xs text-slate-500">
                   Total recoverable value vs. settled revenue.
@@ -289,11 +278,11 @@ export const RecoveriesAnalyticsView: React.FC<
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-xs bg-blue-500"></span>
-                Total Identified
+                Approved Recovery Value
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-xs bg-emerald-500"></span>
-                Webhook Settled
+                Settled Recovered
               </span>
             </div>
             <span className="font-mono text-[11px] text-slate-400">
@@ -339,7 +328,7 @@ export const RecoveriesAnalyticsView: React.FC<
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-slate-500 font-tabular">
                       <span>{cohort.count} opportunities</span>
-                      <span>{cohort.conversion_rate_pct}% approval yield</span>
+                      <span>{cohort.conversion_rate_pct}% conversion rate</span>
                     </div>
                   </div>
                 );

@@ -68,7 +68,7 @@ describe('PolicyEngine Stopping Rules & Escalation Gates', () => {
           action_type: 'discounted_payment_link',
           amount_paise: 200000,
           discount_percent: 5,
-          status: 'expired',
+          status: 'EXPIRED',
           created_at: pastTime,
           expires_at: new Date(pastTime.getTime() + 24 * 3600 * 1000),
         },

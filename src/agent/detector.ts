@@ -16,6 +16,17 @@ const STRATEGY_COOLDOWNS: Record<string, number> = {
   WINBACK: 30,
 };
 
+/**
+ * BUSINESS RULE: One Active Recovery Per Customer
+ * ─────────────────────────────────────────────────
+ * RevenueGuard permits only one active recovery action per customer at a time.
+ * Each detector candidate query includes `customer.recovery_offers.none({ status: ['PENDING', 'DISPATCHED'] })`
+ * which excludes customers who already have an in-flight offer, regardless of opportunity type.
+ *
+ * This prevents customer harassment and ensures a single coherent recovery conversation.
+ * A customer becomes eligible for new opportunities once their active offer resolves
+ * (RECOVERED, EXPIRED, BLOCKED, or EXECUTION_FAILED).
+ */
 export async function detectOpportunities(prisma: PrismaClient): Promise<CustomerOpportunity[]> {
   const opportunities: CustomerOpportunity[] = [];
 
@@ -43,7 +54,7 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
       customer: {
         recovery_offers: {
           none: {
-            status: { in: ['PENDING', 'DISPATCHED', 'pending', 'sent'] },
+            status: { in: ['PENDING', 'DISPATCHED'] },
             expires_at: { gt: now },
           },
         },
@@ -118,7 +129,7 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
       customer: {
         recovery_offers: {
           none: {
-            status: { in: ['PENDING', 'DISPATCHED', 'pending', 'sent'] },
+            status: { in: ['PENDING', 'DISPATCHED'] },
             expires_at: { gt: now },
           },
         },
@@ -184,7 +195,7 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
       },
       recovery_offers: {
         none: {
-          status: { in: ['PENDING', 'DISPATCHED', 'pending', 'sent'] },
+          status: { in: ['PENDING', 'DISPATCHED'] },
           expires_at: { gt: now },
         },
       },
@@ -206,7 +217,7 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
     });
     if (recentUpsell && recentUpsell.status !== 'OPEN') continue;
 
-    const idempotencyKey = `UPSELL:${customer.id}:${now.toISOString().slice(0, 10)}`;
+    const idempotencyKey = `UPSELL:${customer.id}:PREMIUM_UPSELL`;
     let oppRecord = recentUpsell || (await prisma.recoveryOpportunity.findUnique({
       where: { idempotency_key: idempotencyKey },
     }));
@@ -259,7 +270,7 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
       last_purchase_date: { lte: thirtyDaysAgo },
       recovery_offers: {
         none: {
-          status: { in: ['PENDING', 'DISPATCHED', 'pending', 'sent'] },
+          status: { in: ['PENDING', 'DISPATCHED'] },
           expires_at: { gt: now },
         },
       },
@@ -281,7 +292,7 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
     });
     if (recentWinback && recentWinback.status !== 'OPEN') continue;
 
-    const idempotencyKey = `REENGAGEMENT:${customer.id}:${now.toISOString().slice(0, 10)}`;
+    const idempotencyKey = `REENGAGEMENT:${customer.id}:WINBACK`;
     let oppRecord = recentWinback || (await prisma.recoveryOpportunity.findUnique({
       where: { idempotency_key: idempotencyKey },
     }));

@@ -46,14 +46,12 @@ export class AnalyticsService {
       if (
         offer.policy_verdict === 'APPROVED' ||
         offer.status === 'DISPATCHED' ||
-        offer.status === 'RECOVERED' ||
-        offer.status === 'sent' ||
-        offer.status === 'simulated'
+        offer.status === 'RECOVERED'
       ) {
         current.recoverable_paise += discounted;
       }
 
-      if (offer.status === 'RECOVERED' || offer.status === 'redeemed') {
+      if (offer.status === 'RECOVERED') {
         current.recovered_paise += discounted;
       }
 
@@ -102,8 +100,7 @@ export class AnalyticsService {
         offer.policy_verdict === 'APPROVED' ||
         offer.status === 'DISPATCHED' ||
         offer.status === 'RECOVERED' ||
-        offer.status === 'sent' ||
-        offer.status === 'simulated';
+        offer.status === 'EXECUTION_FAILED';
 
       if (isApproved) {
         cohortGroups[type].approved_count++;
@@ -112,13 +109,12 @@ export class AnalyticsService {
       if (
         offer.status === 'DISPATCHED' ||
         offer.status === 'RECOVERED' ||
-        offer.status === 'sent' ||
-        offer.status === 'simulated'
+        offer.status === 'EXPIRED'
       ) {
         cohortGroups[type].dispatched_count++;
       }
 
-      if (offer.status === 'RECOVERED' || offer.status === 'redeemed') {
+      if (offer.status === 'RECOVERED') {
         cohortGroups[type].recovered_count++;
       }
     }

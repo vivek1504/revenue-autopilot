@@ -136,7 +136,7 @@ describe('PolicyEngine Deterministic Rules', () => {
         action_type: 'discounted_payment_link',
         amount_paise: 850000,
         discount_percent: 5,
-        status: 'pending',
+        status: 'PENDING',
         created_at: now,
         expires_at: expiresAt,
       },
