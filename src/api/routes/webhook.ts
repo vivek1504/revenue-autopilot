@@ -91,7 +91,10 @@ export function createWebhookRouter(
           razorpay_payment_link_id: paymentLinkId,
           status: 'DISPATCHED',
         },
-        data: { status: 'RECOVERED' },
+        data: {
+          status: 'RECOVERED',
+          recovered_at: new Date(),
+        },
       });
 
       if (updateResult.count > 0) {

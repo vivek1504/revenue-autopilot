@@ -25,7 +25,10 @@ export function createSimulateRouter(
         id: offer_id,
         status: 'DISPATCHED',
       },
-      data: { status: 'RECOVERED' },
+      data: {
+        status: 'RECOVERED',
+        recovered_at: new Date(),
+      },
     });
 
     if (updateResult.count === 0) {

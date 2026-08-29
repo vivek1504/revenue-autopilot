@@ -17,6 +17,7 @@ export class AnalyticsService {
     const recoveredOffers = await this.prisma.recoveryOffer.findMany({
       where: { status: 'RECOVERED' },
       select: {
+        recovered_at: true,
         created_at: true,
         amount_paise: true,
         discount_percent: true,
@@ -51,8 +52,9 @@ export class AnalyticsService {
     }
 
     for (const offer of recoveredOffers) {
-      const dateKey = offer.created_at.toISOString().split('T')[0]!;
-      const label = offer.created_at.toLocaleDateString('en-US', {
+      const eventDate = offer.recovered_at || offer.created_at;
+      const dateKey = eventDate.toISOString().split('T')[0]!;
+      const label = eventDate.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
       });
