@@ -20,8 +20,10 @@ export class TelemetryService {
     let blockedCount = 0;
 
     for (const rec of items) {
-      if (rec.verdict.verdict === 'BLOCKED') {
-        blockedCount++;
+      if (rec.verdict.verdict === 'BLOCKED' || rec.verdict.verdict === 'ESCALATED') {
+        if (rec.verdict.verdict === 'BLOCKED') {
+          blockedCount++;
+        }
         const violations = rec.verdict.violations || [];
         for (const v of violations) {
           const rule = (v.rule || '').toLowerCase();
@@ -37,6 +39,8 @@ export class TelemetryService {
             limitCatches++;
           } else if (rule === 'confidence_threshold') {
             confidenceCatches++;
+          } else if (rule === 'duplicate_offer') {
+            integrityCatches++;
           } else {
             integrityCatches++;
           }
