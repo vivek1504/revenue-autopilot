@@ -1,9 +1,23 @@
-import { ProcessedAction, TimeSeriesPoint, CohortPerformance } from '../shared/types';
+import { PrismaClient } from '@prisma/client';
+import { TimeSeriesPoint, CohortPerformance, OpportunityType } from '../shared/types';
 import { prisma as globalPrisma } from '../api/dependencies';
 
 export class AnalyticsService {
-  public async getTimeseries(items: ProcessedAction[]): Promise<TimeSeriesPoint[]> {
-    if (items.length === 0) {
+  constructor(private prisma: PrismaClient = globalPrisma) {}
+
+  public async getTimeseries(): Promise<TimeSeriesPoint[]> {
+    const offers = await this.prisma.recoveryOffer.findMany({
+      select: {
+        created_at: true,
+        amount_paise: true,
+        discount_percent: true,
+        status: true,
+        policy_verdict: true,
+      },
+      orderBy: { created_at: 'asc' },
+    });
+
+    if (offers.length === 0) {
       return [];
     }
 
@@ -12,29 +26,9 @@ export class AnalyticsService {
       { label: string; recoverable_paise: number; recovered_paise: number }
     >();
 
-    // Fetch redeemed/recovered offers to get real recovered amounts
-    let redeemedOffers: { created_at: Date; amount_paise: number; discount_percent: number }[] = [];
-    try {
-      redeemedOffers = await globalPrisma.recoveryOffer.findMany({
-        where: { status: { in: ['RECOVERED', 'redeemed'] } },
-        select: { created_at: true, amount_paise: true, discount_percent: true },
-      });
-    } catch {
-      redeemedOffers = [];
-    }
-
-    const sorted = [...items].sort((a, b) => {
-      const tA = new Date(a.auditRecord?.timestamp || 0).getTime();
-      const tB = new Date(b.auditRecord?.timestamp || 0).getTime();
-      return tA - tB;
-    });
-
-    for (const item of sorted) {
-      const ts = item.auditRecord?.timestamp
-        ? new Date(item.auditRecord.timestamp)
-        : new Date();
-      const dateKey = ts.toISOString().split('T')[0]!;
-      const label = ts.toLocaleDateString('en-US', {
+    for (const offer of offers) {
+      const dateKey = offer.created_at.toISOString().split('T')[0]!;
+      const label = offer.created_at.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
       });
@@ -45,36 +39,25 @@ export class AnalyticsService {
         recovered_paise: 0,
       };
 
-      if (item.verdict.verdict === 'APPROVED') {
-        const discounted = Math.round(
-          (item.proposal.amount_paise || 0) *
-            (1 - (item.proposal.discount_percent || 0) / 100)
-        );
-        current.recoverable_paise += discounted;
-      }
-      pointsMap.set(dateKey, current);
-    }
-
-    // Add real recovered amounts to the corresponding date buckets
-    for (const offer of redeemedOffers) {
-      const dateKey = offer.created_at.toISOString().split('T')[0]!;
       const discounted = Math.round(
         offer.amount_paise * (1 - (offer.discount_percent || 0) / 100)
       );
-      const existing = pointsMap.get(dateKey);
-      if (existing) {
-        existing.recovered_paise += discounted;
-      } else {
-        const label = offer.created_at.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-        });
-        pointsMap.set(dateKey, {
-          label,
-          recoverable_paise: 0,
-          recovered_paise: discounted,
-        });
+
+      if (
+        offer.policy_verdict === 'APPROVED' ||
+        offer.status === 'DISPATCHED' ||
+        offer.status === 'RECOVERED' ||
+        offer.status === 'sent' ||
+        offer.status === 'simulated'
+      ) {
+        current.recoverable_paise += discounted;
       }
+
+      if (offer.status === 'RECOVERED' || offer.status === 'redeemed') {
+        current.recovered_paise += discounted;
+      }
+
+      pointsMap.set(dateKey, current);
     }
 
     const entries = Array.from(pointsMap.entries());
@@ -86,35 +69,65 @@ export class AnalyticsService {
     }));
   }
 
-  public getCohorts(items: ProcessedAction[]): CohortPerformance[] {
+  public async getCohorts(): Promise<CohortPerformance[]> {
+    const offers = await this.prisma.recoveryOffer.findMany({
+      select: {
+        opportunity_type: true,
+        amount_paise: true,
+        discount_percent: true,
+        policy_verdict: true,
+        status: true,
+      },
+    });
+
     const cohortGroups: Record<
-      string,
-      { count: number; volume_paise: number; approved_count: number }
+      OpportunityType,
+      { count: number; volume_paise: number; approved_count: number; dispatched_count: number; recovered_count: number }
     > = {
-      abandoned_checkout: { count: 0, volume_paise: 0, approved_count: 0 },
-      failed_payment: { count: 0, volume_paise: 0, approved_count: 0 },
-      upsell: { count: 0, volume_paise: 0, approved_count: 0 },
-      re_engagement: { count: 0, volume_paise: 0, approved_count: 0 },
+      abandoned_checkout: { count: 0, volume_paise: 0, approved_count: 0, dispatched_count: 0, recovered_count: 0 },
+      failed_payment: { count: 0, volume_paise: 0, approved_count: 0, dispatched_count: 0, recovered_count: 0 },
+      upsell: { count: 0, volume_paise: 0, approved_count: 0, dispatched_count: 0, recovered_count: 0 },
+      re_engagement: { count: 0, volume_paise: 0, approved_count: 0, dispatched_count: 0, recovered_count: 0 },
     };
 
-    for (const item of items) {
-      const type = item.proposal.opportunity_type;
+    for (const offer of offers) {
+      const type = (offer.opportunity_type as OpportunityType) || 'abandoned_checkout';
       if (!cohortGroups[type]) {
-        cohortGroups[type] = { count: 0, volume_paise: 0, approved_count: 0 };
+        cohortGroups[type] = { count: 0, volume_paise: 0, approved_count: 0, dispatched_count: 0, recovered_count: 0 };
       }
       cohortGroups[type].count++;
-      cohortGroups[type].volume_paise += item.proposal.amount_paise || 0;
-      if (item.verdict.verdict === 'APPROVED') {
+      cohortGroups[type].volume_paise += offer.amount_paise;
+
+      const isApproved =
+        offer.policy_verdict === 'APPROVED' ||
+        offer.status === 'DISPATCHED' ||
+        offer.status === 'RECOVERED' ||
+        offer.status === 'sent' ||
+        offer.status === 'simulated';
+
+      if (isApproved) {
         cohortGroups[type].approved_count++;
+      }
+
+      if (
+        offer.status === 'DISPATCHED' ||
+        offer.status === 'RECOVERED' ||
+        offer.status === 'sent' ||
+        offer.status === 'simulated'
+      ) {
+        cohortGroups[type].dispatched_count++;
+      }
+
+      if (offer.status === 'RECOVERED' || offer.status === 'redeemed') {
+        cohortGroups[type].recovered_count++;
       }
     }
 
     const totalVolume =
-      Object.values(cohortGroups).reduce((sum, g) => sum + g.volume_paise, 0) ||
-      1;
+      Object.values(cohortGroups).reduce((sum, g) => sum + g.volume_paise, 0) || 1;
 
-    const computeRate = (approved: number, count: number) =>
-      count > 0 ? Math.round((approved / count) * 1000) / 10 : 0;
+    const computeRate = (numerator: number, denominator: number) =>
+      denominator > 0 ? Math.round((numerator / denominator) * 1000) / 10 : 0;
 
     return [
       {
@@ -127,8 +140,8 @@ export class AnalyticsService {
           cohortGroups.abandoned_checkout.count
         ),
         conversion_rate_pct: computeRate(
-          cohortGroups.abandoned_checkout.approved_count,
-          cohortGroups.abandoned_checkout.count
+          cohortGroups.abandoned_checkout.recovered_count,
+          cohortGroups.abandoned_checkout.dispatched_count || cohortGroups.abandoned_checkout.approved_count
         ),
         percentage_of_total: Math.round(
           (cohortGroups.abandoned_checkout.volume_paise / totalVolume) * 100
@@ -144,8 +157,8 @@ export class AnalyticsService {
           cohortGroups.failed_payment.count
         ),
         conversion_rate_pct: computeRate(
-          cohortGroups.failed_payment.approved_count,
-          cohortGroups.failed_payment.count
+          cohortGroups.failed_payment.recovered_count,
+          cohortGroups.failed_payment.dispatched_count || cohortGroups.failed_payment.approved_count
         ),
         percentage_of_total: Math.round(
           (cohortGroups.failed_payment.volume_paise / totalVolume) * 100
@@ -161,8 +174,8 @@ export class AnalyticsService {
           cohortGroups.upsell.count
         ),
         conversion_rate_pct: computeRate(
-          cohortGroups.upsell.approved_count,
-          cohortGroups.upsell.count
+          cohortGroups.upsell.recovered_count,
+          cohortGroups.upsell.dispatched_count || cohortGroups.upsell.approved_count
         ),
         percentage_of_total: Math.round(
           (cohortGroups.upsell.volume_paise / totalVolume) * 100
@@ -178,8 +191,8 @@ export class AnalyticsService {
           cohortGroups.re_engagement.count
         ),
         conversion_rate_pct: computeRate(
-          cohortGroups.re_engagement.approved_count,
-          cohortGroups.re_engagement.count
+          cohortGroups.re_engagement.recovered_count,
+          cohortGroups.re_engagement.dispatched_count || cohortGroups.re_engagement.approved_count
         ),
         percentage_of_total: Math.round(
           (cohortGroups.re_engagement.volume_paise / totalVolume) * 100
