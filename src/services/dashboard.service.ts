@@ -1,10 +1,10 @@
 import { PrismaClient } from '@prisma/client';
-import { ProcessedAction, DashboardSummary } from '../shared/types';
+import { DashboardSummary } from '../shared/types';
 
 export class DashboardService {
   constructor(private prisma: PrismaClient) {}
 
-  public async getSummary(items?: ProcessedAction[]): Promise<DashboardSummary> {
+  public async getSummary(): Promise<DashboardSummary> {
     const totalCustomers = await this.prisma.customer.count();
 
     // 1. Revenue at Risk: event-backed opportunities (actual money at risk) that are OPEN or PURSUING
@@ -29,7 +29,7 @@ export class DashboardService {
 
     const totalOpportunitiesCount = await this.prisma.recoveryOpportunity.count();
 
-    // 3. Offers stats
+    // 3. Offers stats from PostgreSQL
     const allOffers = await this.prisma.recoveryOffer.findMany({
       select: {
         id: true,
@@ -66,11 +66,15 @@ export class DashboardService {
     const recoveredOffers = allOffers.filter(
       (o) => o.status === 'RECOVERED' || o.status === 'redeemed'
     );
+    const blockedOffers = allOffers.filter(
+      (o) => o.policy_verdict === 'BLOCKED' || o.status === 'BLOCKED'
+    );
 
     const approvedCount = approvedOffers.length;
     const escalatedCount = escalatedOffers.length;
     const dispatchedCount = dispatchedOffers.length;
     const recoveredCount = recoveredOffers.length;
+    const blockedCount = blockedOffers.length;
 
     // Approved Value
     const approvedValuePaise = approvedOffers.reduce((sum, o) => {
@@ -84,22 +88,16 @@ export class DashboardService {
       return sum + discounted;
     }, 0);
 
+    // Unsafe Value Blocked (persisted in recovery_offers)
+    const unsafeValueBlockedPaise = blockedOffers.reduce(
+      (sum, o) => sum + o.amount_paise,
+      0
+    );
+
     // Live links created
     const liveLinksCreated = allOffers.filter(
       (o) => o.execution_mode === 'LIVE' || (o as any).execution_mode === 'live'
     ).length;
-
-    // Blocked count & unsafe value blocked
-    let blockedCount = 0;
-    let unsafeValueBlockedPaise = 0;
-    if (items && items.length > 0) {
-      const blockedItems = items.filter((i) => i.verdict.verdict === 'BLOCKED');
-      blockedCount = blockedItems.length;
-      unsafeValueBlockedPaise = blockedItems.reduce(
-        (sum, i) => sum + (i.proposal.amount_paise || 0),
-        0
-      );
-    }
 
     // Total evaluated = approved + escalated + blocked
     const totalEvaluated = approvedCount + escalatedCount + blockedCount;
@@ -119,7 +117,7 @@ export class DashboardService {
       ? Math.round((recoveredValuePaise / approvedValuePaise) * 1000) / 10
       : 0;
 
-    // Recovery Yield = recovered_value / (revenue_at_risk + expansion_opportunity)
+    // Recovery Yield = recovered_value / (revenue_at_risk + expansion_opportunity + recovered_value)
     const totalPipelineValue = revenueAtRiskPaise + expansionOpportunityPaise + recoveredValuePaise;
     const recoveryYieldPct = totalPipelineValue > 0
       ? Math.round((recoveredValuePaise / totalPipelineValue) * 1000) / 10
@@ -133,7 +131,7 @@ export class DashboardService {
 
     return {
       total_customers: totalCustomers,
-      opportunities_count: totalOpportunitiesCount || (items?.length ?? 0),
+      opportunities_count: totalOpportunitiesCount,
       revenue_at_risk_paise: revenueAtRiskPaise,
       expansion_opportunity_paise: expansionOpportunityPaise,
       approved_count: approvedCount,
@@ -150,8 +148,6 @@ export class DashboardService {
       recovery_yield_pct: recoveryYieldPct,
       avg_recovery_value_paise: avgRecoveryValuePaise,
       live_links_created: liveLinksCreated,
-      recovery_rate_pct: approvalRatePct,
-      redeemed_count: recoveredCount,
       deltas: {
         recoverable_delta_pct: null,
         recovered_delta_pct: null,

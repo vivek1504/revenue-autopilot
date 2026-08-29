@@ -222,12 +222,12 @@ async function runEndToEndSimulatedTest() {
   // Verification 1: Verify Policy Rules
   console.log('\n🔍 [3/6] Verifying Policy Engine verdicts and rule catches...');
   
-  const advAction = scan1.results.find((r) => r.proposal.customer_id === 'cust_test_adv');
-  if (!advAction || advAction.verdict.verdict !== 'BLOCKED') {
-    throw new Error('FAIL: Adversarial customer was not BLOCKED!');
+  const excessAction = scan1.results.find((r) => r.proposal.customer_id === 'cust_test_excess');
+  if (!excessAction || excessAction.verdict.verdict !== 'BLOCKED') {
+    throw new Error('FAIL: High-value customer was not BLOCKED!');
   }
-  console.log(`   ✅ Adversarial Injection: BLOCKED with ${advAction.verdict.violations.length} violations:`);
-  advAction.verdict.violations.forEach((v) => console.log(`      └─ [${v.rule}]: ${v.message}`));
+  console.log(`   ✅ High-Value Policy Limit: BLOCKED with ${excessAction.verdict.violations.length} violations:`);
+  excessAction.verdict.violations.forEach((v) => console.log(`      └─ [${v.rule}]: ${v.message}`));
 
   const stopAction = scan1.results.find((r) => r.proposal.customer_id === 'cust_test_stop');
   if (!stopAction || stopAction.verdict.verdict !== 'BLOCKED') {
@@ -279,22 +279,24 @@ async function runEndToEndSimulatedTest() {
   console.log('\n🔁 [6/6] Testing Multi-Scan Idempotency (Running Simulated Scan #2)...');
   const scan2 = await runAutopilot({ mode: 'simulated' });
   
-  const currentActions = await getAllCurrentActions();
   const dashboardService = new DashboardService(prisma);
-  const summary = await dashboardService.getSummary(currentActions);
+  const summary = await dashboardService.getSummary();
 
   console.log(`   After 2 consecutive scans:`);
   console.log(`   - Deduplicated Active Opportunities: ${summary.opportunities_count} (Expected: 7)`);
   console.log(`   - Approved Count:                   ${summary.approved_count} (Expected: 5)`);
   console.log(`   - Blocked Count:                    ${summary.blocked_count} (Expected: 2)`);
-  console.log(`   - Total Revenue Protected:         ₹${(summary.unsafe_value_blocked_paise / 100).toLocaleString('en-IN')} (Expected: ₹50,000)`);
+  console.log(`   - Total Unsafe Value Blocked:       ₹${(summary.unsafe_value_blocked_paise / 100).toLocaleString('en-IN')} (Expected: ₹37,500)`);
   console.log(`   - Total Recoverable Value:         ₹${(summary.approved_value_paise / 100).toLocaleString('en-IN')}`);
 
   if (summary.opportunities_count !== 7) {
-    throw new Error(`FAIL: Opportunities count inflated to ${summary.opportunities_count}, expected 7!`);
+    throw new Error(`FAIL: Opportunities count is ${summary.opportunities_count}, expected 7!`);
   }
-  if (summary.unsafe_value_blocked_paise !== 5250000) {
-    throw new Error(`FAIL: Unsafe value inflated to ₹${summary.unsafe_value_blocked_paise / 100}, expected ₹52,500!`);
+  if (summary.blocked_count !== 2) {
+    throw new Error(`FAIL: Blocked count is ${summary.blocked_count}, expected 2!`);
+  }
+  if (summary.unsafe_value_blocked_paise !== 3750000) {
+    throw new Error(`FAIL: Unsafe value is ₹${summary.unsafe_value_blocked_paise / 100}, expected ₹37,500!`);
   }
 
   console.log('\n================================================================');

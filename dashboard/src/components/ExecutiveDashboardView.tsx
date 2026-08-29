@@ -79,18 +79,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
   const recoveredPaise = summary?.recovered_value_paise || 0;
 
   const chartPoints: TimeSeriesPoint[] =
-    timeseries && timeseries.length > 0
-      ? timeseries
-      : totalRecPaise > 0 || approvedPaise > 0
-        ? [
-          {
-            period: 'Current Run',
-            label: 'Current Run',
-            recoverable_paise: totalRecPaise,
-            recovered_paise: recoveredPaise,
-          },
-        ]
-        : [];
+    timeseries && timeseries.length > 0 ? timeseries : [];
 
   const maxVolume = Math.max(
     ...chartPoints.map((p) => p.recoverable_paise),
@@ -150,7 +139,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
           <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
             <span className="text-slate-500">Webhook verified</span>
             <span className="font-bold text-emerald-700 font-tabular font-mono">
-              {summary?.redeemed_count || 0} Paid
+              {summary?.recovered_count || 0} Paid
             </span>
           </div>
         </div>
@@ -178,12 +167,12 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Card 3: Revenue Protected */}
+        {/* Card 3: Unsafe Value Blocked */}
         <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between text-slate-500 mb-2">
               <span className="text-xs font-bold uppercase tracking-wider">
-                Revenue Protected
+                Unsafe Value Blocked
               </span>
               <div className="w-7 h-7 rounded-lg bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-700">
                 <XCircle className="w-4 h-4" />
@@ -201,12 +190,12 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Card 4: Scanned Accounts */}
+        {/* Card 4: Opportunities Detected */}
         <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between text-slate-500 mb-2">
               <span className="text-xs font-bold uppercase tracking-wider">
-                Scanned Accounts
+                Opportunities Detected
               </span>
               <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700">
                 <Zap className="w-4 h-4" />
@@ -217,9 +206,11 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
             </div>
           </div>
           <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500">Approval Yield</span>
+            <span className="text-slate-500">Approval Rate</span>
             <span className="font-bold text-slate-800 font-tabular font-mono">
-              {items.length > 0
+              {summary?.approval_rate_pct != null
+                ? `${summary.approval_rate_pct}%`
+                : items.length > 0
                 ? `${Math.round((executedCount / items.length) * 100)}%`
                 : '100%'}
             </span>
@@ -274,7 +265,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-base font-bold text-slate-900">
-                  Recovery Pipeline Yield & Revenue Trajectory
+                  Recovery Volume by Date
                 </h3>
                 <p className="text-xs text-slate-500">
                   Recoverable opportunity volume identified vs. policy approved pipeline.
@@ -290,7 +281,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
               {chartPoints.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs">
                   <Clock className="w-8 h-8 mb-2 stroke-1" />
-                  No scan events recorded yet. Run Autopilot from the sidebar to visualize pipeline yield.
+                  No recovery activity yet. Run Autopilot to begin detecting revenue opportunities.
                 </div>
               ) : (
                 <div className="h-full flex items-end justify-between gap-6 px-4 pb-6 border-b border-slate-200">
@@ -383,11 +374,12 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
               {items.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 text-xs flex flex-col items-center justify-center">
                   <Clock className="w-6 h-6 mb-2 stroke-1" />
-                  No evaluation events recorded yet. Click &quot;Run Autopilot&quot; to begin.
+                  No recovery decisions recorded yet.
                 </div>
               ) : (
                 items.slice(0, 5).map((item, idx) => {
                   const isApproved = item.verdict.verdict === 'APPROVED';
+                  const isEscalated = item.verdict.verdict === 'ESCALATED';
                   return (
                     <div
                       key={idx}
@@ -398,11 +390,15 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
                         <div
                           className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${isApproved
                             ? 'bg-emerald-100 text-emerald-700'
+                            : isEscalated
+                            ? 'bg-amber-100 text-amber-700'
                             : 'bg-rose-100 text-rose-700'
                             }`}
                         >
                           {isApproved ? (
                             <CheckCircle2 className="w-3.5 h-3.5" />
+                          ) : isEscalated ? (
+                            <Clock className="w-3.5 h-3.5" />
                           ) : (
                             <XCircle className="w-3.5 h-3.5" />
                           )}
@@ -424,6 +420,8 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
                         <span
                           className={`text-[9px] font-bold uppercase font-mono px-1.5 py-0.2 rounded ${isApproved
                             ? 'bg-emerald-50 text-emerald-700'
+                            : isEscalated
+                            ? 'bg-amber-50 text-amber-700'
                             : 'bg-rose-50 text-rose-700'
                             }`}
                         >
@@ -494,6 +492,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
               ) : (
                 items.slice(0, 6).map((item, idx) => {
                   const isApproved = item.verdict.verdict === 'APPROVED';
+                  const isEscalated = item.verdict.verdict === 'ESCALATED';
                   const conf = item.proposal.confidence_score
                     ? Math.round(item.proposal.confidence_score * 100)
                     : null;
@@ -524,11 +523,15 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
                         <span
                           className={`inline-flex items-center gap-1 text-[10px] font-bold font-mono uppercase px-2 py-0.5 rounded border ${isApproved
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : isEscalated
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
                             : 'bg-rose-50 text-rose-700 border-rose-200'
                             }`}
                         >
                           {isApproved ? (
                             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          ) : isEscalated ? (
+                            <Clock className="w-3 h-3 text-amber-600" />
                           ) : (
                             <XCircle className="w-3 h-3 text-rose-600" />
                           )}

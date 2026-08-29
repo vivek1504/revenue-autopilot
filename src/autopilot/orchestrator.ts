@@ -203,9 +203,42 @@ export async function runAutopilot(
             ai_confidence_score: proposal.confidence_score,
           },
         });
+
+        if (opp.opportunityId) {
+          await prismaClient.recoveryOpportunity.update({
+            where: { id: opp.opportunityId },
+            data: { status: 'PURSUING' },
+          });
+        }
       } else {
         blockedCount++;
         unsafeValueBlockedPaise += proposal.amount_paise;
+
+        await prismaClient.recoveryOffer.create({
+          data: {
+            id: `off_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            customer_id: proposal.customer_id,
+            opportunity_id: opp.opportunityId || null,
+            action_type: proposal.action,
+            amount_paise: proposal.amount_paise,
+            discount_percent: proposal.discount_percent,
+            status: 'BLOCKED',
+            execution_mode: null,
+            created_at: now,
+            expires_at: expiresAt,
+            opportunity_type: proposal.opportunity_type,
+            policy_verdict: 'BLOCKED',
+            ai_reason: proposal.reason,
+            ai_confidence_score: proposal.confidence_score,
+          },
+        });
+
+        if (opp.opportunityId) {
+          await prismaClient.recoveryOpportunity.update({
+            where: { id: opp.opportunityId },
+            data: { status: 'BLOCKED' },
+          });
+        }
       }
 
       // Step 5: Append to Audit Log (Cryptographic SHA-256 Ledger)

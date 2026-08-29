@@ -90,4 +90,63 @@ describe("Opportunity-Level Idempotency & Persistence", () => {
     const cartOppAfter = oppsAfterRecovered.find((o) => o.cart?.id === cartId);
     expect(cartOppAfter).toBeUndefined();
   });
+
+  it("should detect both abandoned cart and failed payment for the same customer without customer-level blocking", async () => {
+    const multiCustId = "cust_multi_opp";
+    await prisma.recoveryOffer.deleteMany({ where: { customer_id: multiCustId } });
+    await prisma.recoveryOpportunity.deleteMany({ where: { customer_id: multiCustId } });
+    await prisma.cart.deleteMany({ where: { customer_id: multiCustId } });
+    await prisma.order.deleteMany({ where: { customer_id: multiCustId } });
+    await prisma.customer.deleteMany({ where: { id: multiCustId } });
+
+    await prisma.customer.create({
+      data: {
+        id: multiCustId,
+        name: "Multi Opp Customer",
+        email: "multiopp@example.com",
+        tier: "standard",
+        lifetime_spend_paise: 3000000,
+        total_orders: 3,
+        created_at: new Date(),
+      },
+    });
+
+    const twoHoursAgo = new Date(Date.now() - 2 * 3600 * 1000);
+    await prisma.cart.create({
+      data: {
+        id: "cart_multi_01",
+        customer_id: multiCustId,
+        items: [] as any,
+        total_paise: 250000,
+        created_at: twoHoursAgo,
+        last_activity: twoHoursAgo,
+        status: "abandoned",
+      },
+    });
+
+    await prisma.order.create({
+      data: {
+        id: "ord_multi_01",
+        customer_id: multiCustId,
+        status: "failed",
+        total_paise: 150000,
+        failure_reason: "BANK_TIMEOUT",
+        created_at: twoHoursAgo,
+        items: [] as any,
+      },
+    });
+
+    const opps = await detectOpportunities(prisma);
+    const cartOpp = opps.find((o) => o.customer.id === multiCustId && o.opportunityType === "abandoned_checkout");
+    const failedOpp = opps.find((o) => o.customer.id === multiCustId && o.opportunityType === "failed_payment");
+
+    expect(cartOpp).toBeDefined();
+    expect(failedOpp).toBeDefined();
+
+    // Clean up
+    await prisma.recoveryOpportunity.deleteMany({ where: { customer_id: multiCustId } });
+    await prisma.cart.deleteMany({ where: { customer_id: multiCustId } });
+    await prisma.order.deleteMany({ where: { customer_id: multiCustId } });
+    await prisma.customer.deleteMany({ where: { id: multiCustId } });
+  });
 });

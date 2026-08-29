@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../dependencies';
-import { getAllCurrentActions } from '../helpers/audit-reader';
 import { DashboardService } from '../../services/dashboard.service';
 
 export function createDashboardRouter(): Router {
@@ -9,8 +8,7 @@ export function createDashboardRouter(): Router {
 
   router.get('/summary', async (req: Request, res: Response) => {
     try {
-      const items = await getAllCurrentActions().catch(() => []);
-      const summary = await dashboardService.getSummary(items);
+      const summary = await dashboardService.getSummary();
       res.json(summary);
     } catch (err: any) {
       res.status(500).json({ error: err.message });

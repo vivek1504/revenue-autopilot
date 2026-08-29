@@ -33,7 +33,7 @@ describe('ActionGateway Execution & Idempotency', () => {
       amount_paise: 5000000,
       discount_percent: 50,
       expiry_hours: 24,
-      reason: 'Adversarial offer',
+      reason: 'Over-limit discount offer',
       opportunity_type: 'abandoned_checkout',
       evidence: {},
     },

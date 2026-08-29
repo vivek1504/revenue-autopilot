@@ -198,6 +198,7 @@ export const RULES: Record<string, RuleCheck> = {
       where: {
         customer_id: proposal.customer_id,
         created_at: { gte: sevenDaysAgo },
+        status: { notIn: ['BLOCKED'] },
       },
     });
 

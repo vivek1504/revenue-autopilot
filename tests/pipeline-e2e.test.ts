@@ -100,7 +100,7 @@ describe('End-to-End Pipeline Integration (Detect -> Reason -> Policy -> Execute
     expect(validResult).toBeDefined();
     expect(validResult?.verdict.verdict).toBe('APPROVED');
     expect(validResult?.execution?.mode).toBe('simulated');
-    expect(validResult?.auditRecord.record_hash).toHaveLength(64);
+    expect(validResult?.auditRecord?.record_hash).toHaveLength(64);
 
     // Verify policy violation was caught & blocked by policy engine
     const excessResult = result.results.find((r) => r.proposal.customer_id === 'cust_e2e_excess');
@@ -108,9 +108,29 @@ describe('End-to-End Pipeline Integration (Detect -> Reason -> Policy -> Execute
     expect(excessResult?.verdict.verdict).toBe('BLOCKED');
     expect(excessResult?.verdict.violations.length).toBeGreaterThan(0);
 
+    // Verify DB persistence of BLOCKED decision
+    const blockedOpp = await prisma.recoveryOpportunity.findUnique({
+      where: { idempotency_key: 'ABANDONED_CART:cart_e2e_excess' },
+    });
+    expect(blockedOpp?.status).toBe('BLOCKED');
+
+    const blockedOffer = await prisma.recoveryOffer.findFirst({
+      where: { customer_id: 'cust_e2e_excess' },
+    });
+    expect(blockedOffer?.status).toBe('BLOCKED');
+    expect(blockedOffer?.policy_verdict).toBe('BLOCKED');
+
     // Verify the SHA-256 cryptographic audit chain is 100% valid
     const auditVerification = verifyAuditIntegrity(testAuditPath);
     expect(auditVerification.valid).toBe(true);
     expect(auditVerification.verified_records).toBe(result.total_opportunities);
+
+    // Verify that running autopilot a 2nd time does NOT re-detect the blocked or pursuing opportunities
+    const secondRun = await runAutopilot({
+      mode: 'simulated',
+      customAuditPath: testAuditPath,
+    });
+    const secondExcess = secondRun.results.find((r) => r.proposal.customer_id === 'cust_e2e_excess');
+    expect(secondExcess).toBeUndefined();
   });
 });
