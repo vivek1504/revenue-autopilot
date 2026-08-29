@@ -70,13 +70,13 @@ describe('PolicyEngine Deterministic Rules', () => {
     const overLimitProposal: AgentProposal = {
       customer_id: 'cust_001',
       action: 'discounted_payment_link',
-      amount_paise: 2500000, // ₹25,000 (exceeds ₹10,000 cap!)
+      amount_paise: 15000000, // ₹1,50,000 (exceeds ₹1,00,000 hard ceiling)
       discount_percent: 10,
       expiry_hours: 24,
       reason: 'Extrapolated high purchase intent proposal.',
       opportunity_type: 'abandoned_checkout',
       evidence: {
-        cart_value_paise: 2500000,
+        cart_value_paise: 15000000,
         lifetime_spend_paise: 2200000,
       },
     };

@@ -267,6 +267,29 @@ export function useAutopilot() {
     [refreshAll]
   );
 
+  const resolveEscalation = useCallback(
+    async (offerId: string, decision: 'APPROVED' | 'REJECTED', mode: 'live' | 'simulated') => {
+      try {
+        const res = await fetch(`/api/opportunities/${offerId}/resolve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision, mode }),
+        });
+        if (res.ok) {
+          await refreshAll();
+          return await res.json();
+        } else {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to resolve escalation');
+        }
+      } catch (err: any) {
+        console.error('Failed to resolve escalation:', err);
+        throw err;
+      }
+    },
+    [refreshAll]
+  );
+
   useEffect(() => {
     refreshAll();
   }, [refreshAll]);
@@ -288,6 +311,7 @@ export function useAutopilot() {
     runVerification,
     tamperRecord,
     simulatePayment,
+    resolveEscalation,
     saveSettings,
     exportReport,
     refreshAll,

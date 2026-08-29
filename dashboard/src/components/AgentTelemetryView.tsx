@@ -59,8 +59,74 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
 
   const auditRecordsCount = items.length;
 
-  const ruleCatches = benchmarks?.rule_catches || [];
-  const totalCatches = ruleCatches.reduce((acc, curr) => acc + curr.count, 0);
+  // Derive rule catches from items if benchmarks is empty or 0 catches
+  let derivedRuleCatches = benchmarks?.rule_catches || [];
+  const backendCatchesCount = derivedRuleCatches.reduce((acc, curr) => acc + curr.count, 0);
+
+  if (backendCatchesCount === 0 && items.length > 0) {
+    let discountCatches = 0;
+    let frequencyCatches = 0;
+    let limitCatches = 0;
+    let confidenceCatches = 0;
+    let integrityCatches = 0;
+
+    for (const rec of items) {
+      if (rec.verdict.verdict === 'BLOCKED' || rec.verdict.verdict === 'ESCALATED') {
+        const violations = rec.verdict.violations || [];
+        for (const v of violations) {
+          const rule = (v.rule || '').toLowerCase();
+          if (rule === 'discount_limit' || rule === 'discount_for_action') {
+            discountCatches++;
+          } else if (rule === 'contact_frequency') {
+            frequencyCatches++;
+          } else if (
+            rule === 'human_escalation' ||
+            rule === 'amount_limit' ||
+            rule === 'amount_positive'
+          ) {
+            limitCatches++;
+          } else if (rule === 'confidence_threshold') {
+            confidenceCatches++;
+          } else {
+            integrityCatches++;
+          }
+        }
+      }
+    }
+
+    const totalCalculated =
+      discountCatches + frequencyCatches + limitCatches + confidenceCatches + integrityCatches;
+
+    derivedRuleCatches = [
+      {
+        rule: 'Discount Ceiling Violation (>15%)',
+        count: discountCatches,
+        percentage: totalCalculated > 0 ? Math.round((discountCatches / totalCalculated) * 100) : 0,
+      },
+      {
+        rule: 'Contact Frequency Stopping Rule (3/7d)',
+        count: frequencyCatches,
+        percentage: totalCalculated > 0 ? Math.round((frequencyCatches / totalCalculated) * 100) : 0,
+      },
+      {
+        rule: 'Transaction Limit & Human Escalation (>₹25k/₹100k)',
+        count: limitCatches,
+        percentage: totalCalculated > 0 ? Math.round((limitCatches / totalCalculated) * 100) : 0,
+      },
+      {
+        rule: 'AI Confidence Gate (<70%)',
+        count: confidenceCatches,
+        percentage: totalCalculated > 0 ? Math.round((confidenceCatches / totalCalculated) * 100) : 0,
+      },
+      {
+        rule: 'Data Integrity & Duplicate Guards',
+        count: integrityCatches,
+        percentage: totalCalculated > 0 ? Math.round((integrityCatches / totalCalculated) * 100) : 0,
+      },
+    ];
+  }
+
+  const totalCatches = derivedRuleCatches.reduce((acc, curr) => acc + curr.count, 0);
 
   const lastModelName = items[items.length - 1]?.auditRecord?.llm_reasoning?.model || 'Gemini 3.6 Flash';
   const isHeuristic = items[items.length - 1]?.auditRecord?.llm_reasoning?.used_fallback;
@@ -259,7 +325,7 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
             </p>
 
             <div className="space-y-4">
-              {ruleCatches.map((ruleItem, i) => {
+              {derivedRuleCatches.map((ruleItem, i) => {
                 const barColor = 'bg-rose-600';
                 return (
                   <div

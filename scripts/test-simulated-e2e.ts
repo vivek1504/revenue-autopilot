@@ -159,7 +159,7 @@ async function runEndToEndSimulatedTest() {
       id: 'cart_test_excess',
       customer_id: 'cust_test_excess',
       items: [{ id: 'px', name: 'Server Rack', price_paise: 3500000, qty: 1 }] as any,
-      total_paise: 3500000, // ₹35,000 (exceeds ₹10,000 policy cap!)
+      total_paise: 15000000, // ₹1,50,000 (exceeds ₹1,00,000 hard policy ceiling)
       created_at: twoHoursAgo,
       last_activity: twoHoursAgo,
       status: 'abandoned',
@@ -286,7 +286,7 @@ async function runEndToEndSimulatedTest() {
   console.log(`   - Deduplicated Active Opportunities: ${summary.opportunities_count} (Expected: 7)`);
   console.log(`   - Approved Count:                   ${summary.approved_count} (Expected: 5)`);
   console.log(`   - Blocked Count:                    ${summary.blocked_count} (Expected: 2)`);
-  console.log(`   - Total Unsafe Value Blocked:       ₹${(summary.unsafe_value_blocked_paise / 100).toLocaleString('en-IN')} (Expected: ₹37,500)`);
+  console.log(`   - Total Unsafe Value Blocked:       ₹${(summary.unsafe_value_blocked_paise / 100).toLocaleString('en-IN')} (Expected: ₹1,52,500)`);
   console.log(`   - Total Recoverable Value:         ₹${(summary.approved_value_paise / 100).toLocaleString('en-IN')}`);
 
   if (summary.opportunities_count !== 7) {
@@ -295,8 +295,8 @@ async function runEndToEndSimulatedTest() {
   if (summary.blocked_count !== 2) {
     throw new Error(`FAIL: Blocked count is ${summary.blocked_count}, expected 2!`);
   }
-  if (summary.unsafe_value_blocked_paise !== 3750000) {
-    throw new Error(`FAIL: Unsafe value is ₹${summary.unsafe_value_blocked_paise / 100}, expected ₹37,500!`);
+  if (summary.unsafe_value_blocked_paise !== 15250000) {
+    throw new Error(`FAIL: Unsafe value is ₹${summary.unsafe_value_blocked_paise / 100}, expected ₹1,52,500!`);
   }
 
   console.log('\n================================================================');

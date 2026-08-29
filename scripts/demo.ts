@@ -223,11 +223,16 @@ async function runDemo() {
       if (event.type === 'verdict') {
         const p = event.verdict.proposal;
         const v = event.verdict.verdict;
-        const icon = v === 'APPROVED' ? '✅' : '⛔';
+        const icon = v === 'APPROVED' ? '✅' : v === 'ESCALATED' ? '⚠️' : '⛔';
         console.log(`${icon} [Policy Verdict] ${p.customer_id} (${p.opportunity_type}) -> ${v}`);
         if (v === 'BLOCKED' && event.verdict.violations) {
           event.verdict.violations.forEach((violation) => {
             console.log(`   └─ Violation [${violation.rule}]: ${violation.message}`);
+          });
+        }
+        if (v === 'ESCALATED' && event.verdict.violations) {
+          event.verdict.violations.forEach((violation) => {
+            console.log(`   └─ Escalation Gate [${violation.rule}]: ${violation.message}`);
           });
         }
       } else if (event.type === 'execution' && event.execution) {
@@ -250,6 +255,7 @@ async function runDemo() {
   console.log('================================================================');
   console.log(` Total Opportunities Scanned:  ${result.total_opportunities}`);
   console.log(` Policy Approved Actions:       ${result.approved_count} (Created Live Razorpay Links)`);
+  console.log(` Policy Escalated Review:       ${result.escalated_count} (Held for Manager Review)`);
   console.log(` Policy Blocked Violations:     ${result.blocked_count} (Policy Violations & Stopping Rules)`);
   console.log(` Recoverable Revenue:           ₹${(result.approved_value_paise / 100).toLocaleString('en-IN')}`);
   console.log(` Unsafe Value Blocked:          ₹${(result.unsafe_value_blocked_paise / 100).toLocaleString('en-IN')}`);

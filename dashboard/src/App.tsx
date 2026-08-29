@@ -28,6 +28,7 @@ export function App() {
     runVerification,
     tamperRecord,
     simulatePayment,
+    resolveEscalation,
     saveSettings,
     exportReport,
   } = useAutopilot();
@@ -132,6 +133,8 @@ export function App() {
       <PolicyVerdictModal
         item={selectedVerdictItem}
         onClose={() => setSelectedVerdictItem(null)}
+        onApprove={(id) => resolveEscalation(id, 'APPROVED', executionMode)}
+        onReject={(id) => resolveEscalation(id, 'REJECTED', executionMode)}
       />
     </div>
   );

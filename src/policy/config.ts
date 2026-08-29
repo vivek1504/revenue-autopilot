@@ -1,5 +1,5 @@
 export const DEFAULT_MERCHANT_POLICY = {
-  maxAutomatedTransactionPaise: 10_00_000, // ₹10,000 max (1,000,000 paise)
+  maxAutomatedTransactionPaise: 100_00_000, // ₹1,00,000 max hard ceiling (10,000,000 paise)
   maxDiscountPercent: 15,                  // 15% max discount
   maxExpiryHours: 72,                      // 72 hours max expiry
   minExpiryHours: 1,                       // 1 hour min expiry

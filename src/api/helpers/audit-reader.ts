@@ -27,23 +27,18 @@ export async function getAllCurrentActions(): Promise<ProcessedAction[]> {
   const auditRecords = getAuditRecords();
 
   if (auditRecords.length > 0) {
-    // Keep only the latest evaluated action for each unique customer
-    const latestByCustomer = new Map<string, AuditRecord>();
-    for (const record of auditRecords) {
-      if (record.proposal?.customer_id) {
-        latestByCustomer.set(record.proposal.customer_id, record);
-      }
-    }
+    const evaluatedRecords = auditRecords.filter(
+      (r) => r.event_type === 'PROPOSAL_EVALUATED' || (!r.event_type && r.proposal)
+    );
 
-    const uniqueRecords = Array.from(latestByCustomer.values());
-    const customerIds = uniqueRecords.map((r) => r.proposal.customer_id);
+    const customerIds = evaluatedRecords.map((r) => r.proposal.customer_id);
     const customers = await prisma.customer.findMany({
       where: { id: { in: customerIds } },
       select: { id: true, name: true },
     });
     const customerMap = new Map(customers.map((c) => [c.id, c.name]));
 
-    return uniqueRecords.map((r) => {
+    return evaluatedRecords.map((r) => {
       const custName = customerMap.get(r.proposal.customer_id) || r.proposal.customer_id;
       return {
         proposal: r.proposal,

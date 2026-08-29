@@ -123,6 +123,8 @@ export async function runAutopilot(
         now.getTime() + proposal.expiry_hours * 60 * 60 * 1000
       );
 
+      let createdOffer: any = null;
+
       if (verdict.verdict === 'APPROVED') {
         approvedCount++;
         const discountedPaise = Math.round(
@@ -135,7 +137,7 @@ export async function runAutopilot(
 
         if (execution.error && execution.error !== 'duplicate_prevented') {
           executionFailedCount++;
-          await prismaClient.recoveryOffer.create({
+          createdOffer = await prismaClient.recoveryOffer.create({
             data: {
               id: `off_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
               customer_id: proposal.customer_id,
@@ -155,7 +157,7 @@ export async function runAutopilot(
           });
         } else if (!execution.error) {
           dispatchedCount++;
-          await prismaClient.recoveryOffer.create({
+          createdOffer = await prismaClient.recoveryOffer.create({
             data: {
               id: `off_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
               customer_id: proposal.customer_id,
@@ -185,7 +187,7 @@ export async function runAutopilot(
         }
       } else if (verdict.verdict === 'ESCALATED') {
         escalatedCount++;
-        await prismaClient.recoveryOffer.create({
+        createdOffer = await prismaClient.recoveryOffer.create({
           data: {
             id: `off_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
             customer_id: proposal.customer_id,
@@ -214,7 +216,7 @@ export async function runAutopilot(
         blockedCount++;
         unsafeValueBlockedPaise += proposal.amount_paise;
 
-        await prismaClient.recoveryOffer.create({
+        createdOffer = await prismaClient.recoveryOffer.create({
           data: {
             id: `off_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
             customer_id: proposal.customer_id,
@@ -258,6 +260,8 @@ export async function runAutopilot(
         execution,
         auditRecord,
         customerName: opp.customer.name,
+        offerId: createdOffer?.id,
+        offerStatus: createdOffer?.status,
       };
 
       results.push(processedItem);

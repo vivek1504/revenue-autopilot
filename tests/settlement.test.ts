@@ -173,4 +173,108 @@ describe("Settlement Lifecycle & Simulation", () => {
     expect(responseStatus).toBe(400);
     expect(responseJson.error).toContain("Must be DISPATCHED");
   });
+
+  it("should approve an ESCALATED offer, transition to DISPATCHED, and write audit log", async () => {
+    const { createOpportunitiesRouter } = await import("../src/api/routes/opportunities");
+    const oppRouter = createOpportunitiesRouter();
+    const escOfferId = "off_esc_test_approve";
+
+    await prisma.recoveryOffer.create({
+      data: {
+        id: escOfferId,
+        customer_id: custId,
+        opportunity_id: oppId,
+        action_type: "discounted_payment_link",
+        amount_paise: 3000000,
+        discount_percent: 5,
+        status: "ESCALATED",
+        policy_verdict: "ESCALATED",
+        created_at: new Date(),
+        expires_at: new Date(Date.now() + 24 * 3600 * 1000),
+      },
+    });
+
+    let responseStatus = 200;
+    let responseJson: any = null;
+
+    const mockReq: any = {
+      params: { id: escOfferId },
+      body: { decision: "APPROVED", mode: "simulated" },
+    };
+    const mockRes: any = {
+      status: (code: number) => {
+        responseStatus = code;
+        return mockRes;
+      },
+      json: (data: any) => {
+        responseJson = data;
+        return mockRes;
+      },
+    };
+
+    const postRoute = (oppRouter.stack as any[]).find(
+      (layer) => layer.route && layer.route.path === "/:id/resolve"
+    );
+    await postRoute.route.stack[0].handle(mockReq, mockRes);
+
+    expect(responseStatus).toBe(200);
+    expect(responseJson.status).toBe("resolved");
+    expect(responseJson.decision).toBe("APPROVED");
+
+    const updated = await prisma.recoveryOffer.findUnique({ where: { id: escOfferId } });
+    expect(updated?.status).toBe("DISPATCHED");
+    expect(updated?.razorpay_payment_link_id).toBeDefined();
+    expect(updated?.execution_mode).toBe("SIMULATED");
+  });
+
+  it("should reject an ESCALATED offer and transition to BLOCKED", async () => {
+    const { createOpportunitiesRouter } = await import("../src/api/routes/opportunities");
+    const oppRouter = createOpportunitiesRouter();
+    const escOfferId = "off_esc_test_reject";
+
+    await prisma.recoveryOffer.create({
+      data: {
+        id: escOfferId,
+        customer_id: custId,
+        opportunity_id: oppId,
+        action_type: "discounted_payment_link",
+        amount_paise: 3000000,
+        discount_percent: 5,
+        status: "ESCALATED",
+        policy_verdict: "ESCALATED",
+        created_at: new Date(),
+        expires_at: new Date(Date.now() + 24 * 3600 * 1000),
+      },
+    });
+
+    let responseStatus = 200;
+    let responseJson: any = null;
+
+    const mockReq: any = {
+      params: { id: escOfferId },
+      body: { decision: "REJECTED" },
+    };
+    const mockRes: any = {
+      status: (code: number) => {
+        responseStatus = code;
+        return mockRes;
+      },
+      json: (data: any) => {
+        responseJson = data;
+        return mockRes;
+      },
+    };
+
+    const postRoute = (oppRouter.stack as any[]).find(
+      (layer) => layer.route && layer.route.path === "/:id/resolve"
+    );
+    await postRoute.route.stack[0].handle(mockReq, mockRes);
+
+    expect(responseStatus).toBe(200);
+    expect(responseJson.status).toBe("resolved");
+    expect(responseJson.decision).toBe("REJECTED");
+
+    const updated = await prisma.recoveryOffer.findUnique({ where: { id: escOfferId } });
+    expect(updated?.status).toBe("BLOCKED");
+  });
 });

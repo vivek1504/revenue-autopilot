@@ -5,9 +5,11 @@ import { ProcessedAction } from '../types';
 interface PolicyVerdictModalProps {
   item: ProcessedAction | null;
   onClose: () => void;
+  onApprove?: (id: string) => void;
+  onReject?: (id: string) => void;
 }
 
-export const PolicyVerdictModal: React.FC<PolicyVerdictModalProps> = ({ item, onClose }) => {
+export const PolicyVerdictModal: React.FC<PolicyVerdictModalProps> = ({ item, onClose, onApprove, onReject }) => {
   if (!item) return null;
 
   const isApproved = item.verdict.verdict === 'APPROVED';
@@ -165,7 +167,29 @@ export const PolicyVerdictModal: React.FC<PolicyVerdictModalProps> = ({ item, on
         )}
 
         {/* Footer */}
-        <div className="flex justify-end pt-2 border-t border-slate-200">
+        <div className="flex justify-end pt-2 border-t border-slate-200 gap-2">
+          {isEscalated && item.offerStatus === 'ESCALATED' && onApprove && onReject && (
+            <>
+              <button
+                onClick={() => {
+                  onReject(item.offerId!);
+                  onClose();
+                }}
+                className="px-4 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded-md text-xs font-bold hover:bg-rose-100 transition-colors"
+              >
+                Reject
+              </button>
+              <button
+                onClick={() => {
+                  onApprove(item.offerId!);
+                  onClose();
+                }}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-md text-xs font-bold hover:bg-emerald-700 transition-colors"
+              >
+                Approve & Execute
+              </button>
+            </>
+          )}
           <button
             onClick={onClose}
             className="px-4 py-2 bg-slate-950 text-white rounded-md text-xs font-bold hover:bg-slate-800 transition-colors"
