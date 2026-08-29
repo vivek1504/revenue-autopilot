@@ -19,11 +19,34 @@ export function createSimulateRouter(
       return res.status(400).json({ error: "offer_id is required" });
     }
 
-    const offer = await prisma.recoveryOffer.findUnique({
+    let offer = await prisma.recoveryOffer.findUnique({
       where: { id: offer_id },
     });
     if (!offer) {
+      offer = await prisma.recoveryOffer.findFirst({
+        where: {
+          OR: [
+            { razorpay_payment_link_id: offer_id },
+            { customer_id: offer_id, status: 'DISPATCHED' },
+            { opportunity_id: offer_id, status: 'DISPATCHED' },
+          ],
+        },
+        orderBy: { created_at: 'desc' },
+      });
+    }
+
+    if (!offer) {
       return res.status(404).json({ error: 'Offer not found' });
+    }
+
+    if (offer.status === 'RECOVERED') {
+      return res.status(409).json({ error: 'Offer is already recovered' });
+    }
+
+    if (offer.status !== 'DISPATCHED') {
+      return res.status(400).json({
+        error: `Cannot settle offer with status ${offer.status}. Must be DISPATCHED.`,
+      });
     }
 
     const settled_amount_paise = Math.round(
@@ -33,7 +56,7 @@ export function createSimulateRouter(
     // 1. Atomic conditional update — only transitions active offers to RECOVERED
     const updateResult = await prisma.recoveryOffer.updateMany({
       where: {
-        id: offer_id,
+        id: offer.id,
         status: 'DISPATCHED',
       },
       data: {
@@ -44,18 +67,7 @@ export function createSimulateRouter(
     });
 
     if (updateResult.count === 0) {
-      const existing = await prisma.recoveryOffer.findUnique({
-        where: { id: offer_id },
-      });
-      if (!existing) {
-        return res.status(404).json({ error: 'Offer not found' });
-      }
-      if (existing.status === 'RECOVERED') {
-        return res.status(409).json({ error: 'Offer is already recovered' });
-      }
-      return res.status(400).json({
-        error: `Cannot settle offer with status ${existing.status}. Must be DISPATCHED.`,
-      });
+      return res.status(409).json({ error: 'Offer was already recovered or status changed concurrently' });
     }
 
     const updatedOffer = await prisma.recoveryOffer.findUnique({

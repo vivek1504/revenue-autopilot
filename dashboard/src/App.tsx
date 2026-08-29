@@ -37,9 +37,10 @@ export function App() {
   const [executionMode, setExecutionMode] = useState<'live' | 'simulated'>('live');
   const [selectedVerdictItem, setSelectedVerdictItem] = useState<ProcessedAction | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <div className="flex h-screen w-full bg-[#f8f9ff] text-[#0b1c30] overflow-hidden font-sans">
+    <div className="flex h-screen w-full bg-[#f8f9fc] text-[#091e42] overflow-hidden font-sans">
       {/* 1. Left Sidebar Navigation */}
       <Sidebar
         currentTab={currentTab}
@@ -51,6 +52,8 @@ export function App() {
         processedCount={processedActions.length}
         totalCount={totalOpportunities || summary?.opportunities_count || 0}
         onExport={() => exportReport('csv')}
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
       />
 
       {/* 2. Main Content Area */}
@@ -59,11 +62,13 @@ export function App() {
         <TopNavBar
           searchQuery={searchQuery}
           onSearchChange={(q) => setSearchQuery(q)}
+          currentTab={currentTab}
+          onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
         />
 
         {/* Scrollable Main Canvas */}
-        <main className="flex-1 overflow-y-auto p-6 md:p-8 bg-[#f8f9ff]">
-          <div className="max-w-[1440px] mx-auto w-full">
+        <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 md:px-8 bg-[#f8f9fc]">
+          <div className="w-full">
             {/* View Switcher based on currentTab */}
             {currentTab === 'dashboard' && (
               <ExecutiveDashboardView

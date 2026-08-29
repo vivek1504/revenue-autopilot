@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GitFork, Database, Brain, ShieldCheck, Send, CheckCheck } from 'lucide-react';
+import { GitFork, Database, Brain, ShieldCheck, Send, CheckCheck, Sparkles } from 'lucide-react';
 import { DashboardSummary, ProcessedAction } from '../types';
 import { PipelinesStepper, PipelineStage } from './pipelines/PipelinesStepper';
 import { Stage1Discovery } from './pipelines/Stage1Discovery';
@@ -37,10 +37,16 @@ export const PipelinesView: React.FC<PipelinesViewProps> = ({
 
   // Funnel Counts & Volume
   const totalOpps = items.length || summary?.opportunities_count || 0;
-  const approvedItems = items.filter((i) => i.verdict.verdict === 'APPROVED');
-  const blockedItems = items.filter((i) => i.verdict.verdict === 'BLOCKED');
+  const approvedItems = items.filter(
+    (i) => i.verdict.verdict === 'APPROVED' || i.offerStatus === 'DISPATCHED' || i.offerStatus === 'RECOVERED'
+  );
+  const blockedItems = items.filter(
+    (i) => i.verdict.verdict === 'BLOCKED' && i.offerStatus !== 'DISPATCHED' && i.offerStatus !== 'RECOVERED'
+  );
   const recoveredItems = items.filter((i) => i.offerStatus === 'RECOVERED');
-  const dispatchedItems = items.filter((i) => i.offerStatus === 'DISPATCHED');
+  const dispatchedItems = items.filter(
+    (i) => i.offerStatus === 'DISPATCHED' || (i.verdict.verdict === 'APPROVED' && (!i.offerStatus || i.offerStatus === 'DISPATCHED'))
+  );
   const approvedOpps = approvedItems.length;
   const blockedOpps = blockedItems.length;
   const recoveredOpps = summary?.recovered_count ?? recoveredItems.length;
@@ -58,14 +64,14 @@ export const PipelinesView: React.FC<PipelinesViewProps> = ({
   const stages: PipelineStage[] = [
     {
       id: 1,
-      title: 'Identified',
+      title: 'Database Scan',
       subtitle: 'Postgres Discovery',
       icon: Database,
-      count: `${totalOpps} Opps`,
+      count: `${totalOpps} Candidates`,
       volume: formatRupees(totalVolumePaise),
       latency: '~1.8ms',
-      badge: 'Database Scan',
-      badgeColor: 'bg-slate-100 text-slate-700',
+      badge: 'Signal Ingest',
+      badgeColor: 'bg-slate-100 text-slate-700 border-slate-200',
     },
     {
       id: 2,
@@ -76,64 +82,65 @@ export const PipelinesView: React.FC<PipelinesViewProps> = ({
       volume: formatRupees(totalVolumePaise),
       latency: '~140ms',
       badge: 'Structured LLM',
-      badgeColor: 'bg-blue-50 text-blue-700 border border-blue-200',
+      badgeColor: 'bg-blue-50 text-blue-800 border-blue-200',
     },
     {
       id: 3,
-      title: 'Policy Check',
-      subtitle: 'Deterministic Guard',
+      title: 'Policy Guard',
+      subtitle: 'Deterministic Safety',
       icon: ShieldCheck,
-      count: `${approvedOpps} Passed`,
+      count: `${approvedOpps} Passed / ${blockedOpps} Blocked`,
       volume: formatRupees(approvedVolumePaise),
       latency: '<0.5ms',
-      badge: '100% Deterministic',
-      badgeColor: 'bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold',
+      badge: '100% Policy Bound',
+      badgeColor: 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold',
     },
     {
       id: 4,
-      title: 'Gateway Execution',
+      title: 'Gateway Dispatch',
       subtitle: 'Razorpay Links',
       icon: Send,
       count: `${approvedOpps} Dispatched`,
       volume: formatRupees(approvedVolumePaise),
       latency: '~45ms',
       badge: 'Idempotent Dispatch',
-      badgeColor: 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+      badgeColor: 'bg-blue-50 text-blue-800 border-blue-200',
     },
     {
       id: 5,
-      title: 'Settled',
+      title: 'Settlement',
       subtitle: 'Webhook Verified',
       icon: CheckCheck,
       count: `${recoveredOpps} Recovered`,
       volume: formatRupees(recoveredValuePaise),
       latency: 'Real-Time',
       badge: 'HMAC SHA-256',
-      badgeColor: 'bg-emerald-100 text-emerald-900 border border-emerald-300',
+      badgeColor: 'bg-emerald-100 text-emerald-950 border-emerald-300',
     },
   ];
 
   return (
-    <div className="space-y-8 pb-16 font-sans">
+    <div className="space-y-8 pb-16 font-sans animate-fadeIn">
       {/* 1. Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-3 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-200/80">
         <div>
-          <div className="flex items-center gap-2">
-            <GitFork className="w-6 h-6 text-slate-900" />
-            <h2 className="text-3xl font-extrabold text-[#091e42] tracking-tight font-sans">
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-[#091e42] tracking-tight">
               Autonomous Recovery Pipeline
             </h2>
+
           </div>
-          <p className="text-xs text-slate-500 mt-1 font-sans">
-            Interactive multi-stage execution pipeline: select any step to inspect its unique telemetry, generative reasoning, and gateway state.
+          <p className="text-xs text-slate-500 mt-1">
+            Interactive multi-stage execution pipeline: select any stage to inspect its unique runtime telemetry, generative reasoning, and gateway state.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="text-xs font-semibold px-3 py-1.5 bg-white border border-slate-200 rounded-md text-slate-700 shadow-2xs">
+
+        <div className="flex items-center gap-2.5">
+          <div className="text-xs font-semibold px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 shadow-2xs">
             Pipeline Yield: <strong className="text-emerald-700 font-tabular font-extrabold">{totalOpps > 0 ? ((approvedOpps / totalOpps) * 100).toFixed(1) : 0}%</strong>
           </div>
-          <div className="text-xs font-semibold px-3 py-1.5 bg-white border border-slate-200 rounded-md text-slate-700 shadow-2xs">
-            Active Candidates: <strong className="text-slate-950 font-tabular font-extrabold">{totalOpps} Opportunities</strong>
+          <div className="text-xs font-semibold px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 shadow-2xs">
+            Candidates: <strong className="text-slate-900 font-tabular font-extrabold">{totalOpps} Opps</strong>
           </div>
         </div>
       </div>
