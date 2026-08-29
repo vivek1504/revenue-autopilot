@@ -115,6 +115,7 @@ model RecoveryOffer {
   execution_mode           String?
   created_at               DateTime
   expires_at               DateTime
+  recovered_at             DateTime?
   razorpay_payment_link_id String?
   razorpay_order_id        String?
   opportunity_type         String?

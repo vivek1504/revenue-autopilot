@@ -12,12 +12,14 @@ interface PipelinesViewProps {
   items: ProcessedAction[];
   summary: DashboardSummary | null;
   onSelectVerdict: (item: ProcessedAction) => void;
+  onSimulatePayment?: (offerId: string) => Promise<any>;
 }
 
 export const PipelinesView: React.FC<PipelinesViewProps> = ({
   items,
   summary,
   onSelectVerdict,
+  onSimulatePayment,
 }) => {
   const [selectedStage, setSelectedStage] = useState<number>(3);
 
@@ -37,9 +39,11 @@ export const PipelinesView: React.FC<PipelinesViewProps> = ({
   const totalOpps = items.length || summary?.opportunities_count || 0;
   const approvedItems = items.filter((i) => i.verdict.verdict === 'APPROVED');
   const blockedItems = items.filter((i) => i.verdict.verdict === 'BLOCKED');
+  const recoveredItems = items.filter((i) => i.offerStatus === 'RECOVERED');
+  const dispatchedItems = items.filter((i) => i.offerStatus === 'DISPATCHED');
   const approvedOpps = approvedItems.length;
   const blockedOpps = blockedItems.length;
-  const redeemedOpps = summary?.recovered_count || 0;
+  const recoveredOpps = summary?.recovered_count ?? recoveredItems.length;
   const recoveredValuePaise = summary?.recovered_value_paise || 0;
 
   const totalVolumePaise = items.reduce((sum, i) => sum + (i.proposal.amount_paise || 0), 0);
@@ -101,7 +105,7 @@ export const PipelinesView: React.FC<PipelinesViewProps> = ({
       title: 'Settled',
       subtitle: 'Webhook Verified',
       icon: CheckCheck,
-      count: `${redeemedOpps} Redeemed`,
+      count: `${recoveredOpps} Recovered`,
       volume: formatRupees(recoveredValuePaise),
       latency: 'Real-Time',
       badge: 'HMAC SHA-256',
@@ -129,7 +133,7 @@ export const PipelinesView: React.FC<PipelinesViewProps> = ({
             Pipeline Yield: <strong className="text-emerald-700 font-tabular font-extrabold">{totalOpps > 0 ? ((approvedOpps / totalOpps) * 100).toFixed(1) : 0}%</strong>
           </div>
           <div className="text-xs font-semibold px-3 py-1.5 bg-white border border-slate-200 rounded-md text-slate-700 shadow-2xs">
-            Active Candidates: <strong className="text-slate-950 font-tabular font-extrabold">{totalOpps} Accounts</strong>
+            Active Candidates: <strong className="text-slate-950 font-tabular font-extrabold">{totalOpps} Opportunities</strong>
           </div>
         </div>
       </div>
@@ -178,11 +182,13 @@ export const PipelinesView: React.FC<PipelinesViewProps> = ({
       )}
       {selectedStage === 5 && (
         <Stage5Settlement
-          approvedItems={approvedItems}
-          redeemedOpps={redeemedOpps}
+          recoveredItems={recoveredItems}
+          dispatchedItems={dispatchedItems}
+          recoveredOpps={recoveredOpps}
           recoveredValuePaise={recoveredValuePaise}
           formatRupees={formatRupees}
           formatRupeesExact={formatRupeesExact}
+          onSimulatePayment={onSimulatePayment}
         />
       )}
     </div>

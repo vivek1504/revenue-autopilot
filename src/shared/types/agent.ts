@@ -33,4 +33,6 @@ export interface ProcessedAction {
   execution?: ExecutionResult;
   auditRecord?: AuditRecord;
   customerName?: string;
+  offerId?: string;
+  offerStatus?: string;
 }

@@ -49,6 +49,8 @@ export function createOpportunitiesRouter(): Router {
             }
           : undefined,
         customerName: offer.customer?.name || offer.customer_id,
+        offerId: offer.id,
+        offerStatus: offer.status,
       }));
 
       res.json(items);

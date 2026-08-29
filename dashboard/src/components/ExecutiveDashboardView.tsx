@@ -121,12 +121,12 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
 
       {/* 2. Top-Level Executive KPI Ribbon (5 Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Card 1: Measured Recovered Revenue */}
+        {/* Card 1: Recovered Revenue */}
         <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between text-slate-500 mb-2">
               <span className="text-xs font-bold uppercase tracking-wider">
-                Measured Recovered
+                Recovered Revenue
               </span>
               <div className="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700">
                 <CheckCircle2 className="w-4 h-4" />
@@ -137,37 +137,85 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
             </div>
           </div>
           <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500">Webhook verified</span>
+            <span className="text-slate-500">Verified settlements</span>
             <span className="font-bold text-emerald-700 font-tabular font-mono">
               {summary?.recovered_count || 0} Paid
             </span>
           </div>
         </div>
 
-        {/* Card 2: Recoverable Value (Approved) */}
+        {/* Card 2: Revenue at Risk */}
         <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between text-slate-500 mb-2">
               <span className="text-xs font-bold uppercase tracking-wider">
-                Value Approved for Recovery
+                Revenue at Risk
               </span>
-              <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700">
+              <div className="w-7 h-7 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700">
                 <TrendingUp className="w-4 h-4" />
               </div>
             </div>
             <div className="text-2xl font-black font-tabular text-[#0b1c30] tracking-tight">
-              {formatRupees(approvedPaise)}
+              {formatRupees(summary?.revenue_at_risk_paise || 0)}
             </div>
           </div>
           <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500">Policy Approved</span>
-            <span className="font-bold text-slate-800 font-tabular font-mono">
-              {executedCount} Offers
+            <span className="text-slate-500 truncate">Failed payments & carts</span>
+            <span className="font-bold text-amber-700 font-tabular font-mono shrink-0">
+              Recoverable
             </span>
           </div>
         </div>
 
-        {/* Card 3: Unsafe Value Blocked */}
+        {/* Card 3: Expansion Opportunity */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider">
+                Expansion Opportunity
+              </span>
+              <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700">
+                <Zap className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black font-tabular text-[#0b1c30] tracking-tight">
+              {formatRupees(summary?.expansion_opportunity_paise || 0)}
+            </div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-slate-500 truncate">Upsell & winbacks</span>
+            <span className="font-bold text-blue-700 font-tabular font-mono shrink-0">
+              Estimated
+            </span>
+          </div>
+        </div>
+
+        {/* Card 4: Recovery Conversion */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider">
+                Recovery Conversion
+              </span>
+              <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black font-tabular text-[#0b1c30] tracking-tight">
+              {summary?.recovery_conversion_pct != null
+                ? `${summary.recovery_conversion_pct}%`
+                : '0%'}
+            </div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-slate-500">Recovered / Dispatched</span>
+            <span className="font-bold text-slate-800 font-tabular font-mono">
+              {summary?.recovered_count || 0}/{summary?.dispatched_count || 0}
+            </span>
+          </div>
+        </div>
+
+        {/* Card 5: Unsafe Value Blocked */}
         <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between text-slate-500 mb-2">
@@ -189,72 +237,6 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
             </span>
           </div>
         </div>
-
-        {/* Card 4: Opportunities Detected */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider">
-                Opportunities Detected
-              </span>
-              <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700">
-                <Zap className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-2xl font-black font-tabular text-[#0b1c30] tracking-tight">
-              {summary?.opportunities_count ?? items.length}
-            </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500">Approval Rate</span>
-            <span className="font-bold text-slate-800 font-tabular font-mono">
-              {summary?.approval_rate_pct != null
-                ? `${summary.approval_rate_pct}%`
-                : items.length > 0
-                ? `${Math.round((executedCount / items.length) * 100)}%`
-                : '100%'}
-            </span>
-          </div>
-        </div>
-
-        {/* Card 5: SHA-256 Ledger Integrity */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider">
-                Audit Chain
-              </span>
-              <div
-                className={`w-7 h-7 rounded-lg flex items-center justify-center ${verificationResult && !verificationResult.valid
-                  ? 'bg-rose-50 border border-rose-200 text-rose-700'
-                  : 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                  }`}
-              >
-                {verificationResult && !verificationResult.valid ? (
-                  <ShieldAlert className="w-4 h-4" />
-                ) : (
-                  <ShieldCheck className="w-4 h-4" />
-                )}
-              </div>
-            </div>
-            <div
-              className={`text-xl font-black font-tabular tracking-tight ${verificationResult && !verificationResult.valid
-                ? 'text-rose-700'
-                : 'text-emerald-700'
-                }`}
-            >
-              {verificationResult && !verificationResult.valid
-                ? 'Tamper Detected'
-                : '100% Verified'}
-            </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500">SHA-256 Chain</span>
-            <span className="font-bold text-slate-800 font-mono text-[11px]">
-              {verificationResult?.verified_records ?? items.length} Records
-            </span>
-          </div>
-        </div>
       </div>
 
       {/* 3. Main Operational Grid: Recovery Volume Chart (7 cols) + Action Decision Stream (5 cols) */}
@@ -265,10 +247,10 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-base font-bold text-slate-900">
-                  Recovery Volume by Date
+                  Recovery Activity Over Time
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Recoverable opportunity volume identified vs. policy approved pipeline.
+                  Opportunity volume detected vs. revenue recovered by settlement date.
                 </p>
               </div>
               <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 rounded text-slate-700 font-mono">
@@ -335,11 +317,11 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-xs bg-blue-500"></span>
-                Recoverable Potential
+                Opportunities Identified
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-xs bg-emerald-500"></span>
-                Settled Recovered
+                Settled Recoveries
               </span>
             </div>
             <span className="font-mono text-[11px] text-slate-400">
