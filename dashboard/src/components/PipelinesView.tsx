@@ -39,7 +39,7 @@ export const PipelinesView: React.FC<PipelinesViewProps> = ({
   const blockedItems = items.filter((i) => i.verdict.verdict === 'BLOCKED');
   const approvedOpps = approvedItems.length;
   const blockedOpps = blockedItems.length;
-  const redeemedOpps = summary?.redeemed_count || 0;
+  const redeemedOpps = summary?.recovered_count || 0;
   const recoveredValuePaise = summary?.recovered_value_paise || 0;
 
   const totalVolumePaise = items.reduce((sum, i) => sum + (i.proposal.amount_paise || 0), 0);

@@ -104,8 +104,6 @@ export interface DashboardSummary {
   recovery_yield_pct: number;
   avg_recovery_value_paise: number;
   live_links_created: number;
-  recovery_rate_pct?: number;
-  redeemed_count?: number;
   deltas?: {
     recoverable_delta_pct?: number | null;
     recovered_delta_pct?: number | null;

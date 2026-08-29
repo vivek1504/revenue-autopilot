@@ -210,7 +210,7 @@ export const RecoveriesAnalyticsView: React.FC<
             {formatRupees(recoveredPaise)}
           </div>
           <div className="text-xs text-slate-500 mt-2">
-            {summary?.redeemed_count || 0} verified redemptions
+            {summary?.recovered_count || 0} verified redemptions
           </div>
         </div>
       </div>

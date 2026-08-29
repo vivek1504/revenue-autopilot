@@ -39,7 +39,7 @@ The system uses a **Strategy Pattern** with two interchangeable proposers:
 
 - **`GeminiProposer`** — Calls Gemini 3.6 Flash with structured JSON output schema. The model receives a system prompt defining it as a revenue recovery specialist, plus the full customer context. Responses are validated with Zod against `AgentProposalSchema`. Falls back to heuristics on API failure.
 
-- **`HeuristicProposer`** — Deterministic rule-based proposer for simulated/offline runs. Maps opportunity types to predefined recovery actions (e.g., abandoned cart → discounted payment link with 5-10% off). Includes adversarial test paths triggered by special customer notes.
+- **`HeuristicProposer`** — Deterministic rule-based proposer for simulated/offline runs. Maps opportunity types to predefined recovery actions (e.g., abandoned cart → discounted payment link with 5-10% off).
 
 Every proposal includes: `customer_id`, `action`, `amount_paise`, `discount_percent`, `expiry_hours`, `confidence_score`, `reason`, `opportunity_type`, and an `evidence` object with factual metrics from the database.
 
@@ -311,7 +311,7 @@ npm run test:e2e-sim
 Runs the complete 5-stage pipeline end-to-end in simulated mode against a real database, verifying:
 1. Opportunity detection finds seeded data
 2. Proposals pass Zod schema validation
-3. Policy engine correctly blocks adversarial proposals
+3. Policy engine correctly blocks over-limit and policy-violating proposals
 4. Approved proposals create `RecoveryOffer` database records
 5. Audit chain integrity passes independent verification
 6. Telemetry metrics are populated with real measured values
@@ -335,6 +335,7 @@ Runs the complete 5-stage pipeline end-to-end in simulated mode against a real d
 | GET    | `/api/export/:format`         | Export data as CSV or JSON               |
 | POST   | `/api/webhook/razorpay`       | Razorpay webhook receiver (HMAC-gated)   |
 | GET    | `/api/webhook/razorpay`       | Payment success redirect page            |
+| POST   | `/api/simulate/payment`       | Simulate payment settlement (Sandbox)    |
 
 ---
 
@@ -342,7 +343,7 @@ Runs the complete 5-stage pipeline end-to-end in simulated mode against a real d
 
 1. **Strategy Pattern over mode switches** — `IProposer` and `IExecutionGateway` interfaces allow swapping implementations without touching the orchestrator. The pipeline loop has zero `if (mode === 'live')` checks.
 
-2. **Never short-circuit policy evaluation** — All 13 rules run on every proposal. This is deliberate: the dashboard needs the complete violation set to show which rules would have caught an adversarial proposal.
+2. **Never short-circuit policy evaluation** — All 13 rules run on every proposal. This is deliberate: the dashboard needs the complete violation set for every proposal.
 
 3. **Canonical JSON for audit hashing** — `canonicalJsonStringify` sorts object keys alphabetically and strips `undefined` properties. This ensures `SHA-256(written_record) === SHA-256(parsed_record)` regardless of property insertion order.
 

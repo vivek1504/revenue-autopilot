@@ -321,7 +321,7 @@ export const AgentTelemetryView: React.FC<AgentTelemetryViewProps> = ({
               {items.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-slate-400">
-                    No telemetry events recorded yet.
+                    No telemetry data available.
                   </td>
                 </tr>
               ) : (
