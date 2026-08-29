@@ -19,6 +19,17 @@ export function createSimulateRouter(
       return res.status(400).json({ error: "offer_id is required" });
     }
 
+    const offer = await prisma.recoveryOffer.findUnique({
+      where: { id: offer_id },
+    });
+    if (!offer) {
+      return res.status(404).json({ error: 'Offer not found' });
+    }
+
+    const settled_amount_paise = Math.round(
+      offer.amount_paise * (1 - (offer.discount_percent || 0) / 100)
+    );
+
     // 1. Atomic conditional update — only transitions active offers to RECOVERED
     const updateResult = await prisma.recoveryOffer.updateMany({
       where: {
@@ -28,6 +39,7 @@ export function createSimulateRouter(
       data: {
         status: 'RECOVERED',
         recovered_at: new Date(),
+        settled_amount_paise,
       },
     });
 
@@ -46,43 +58,43 @@ export function createSimulateRouter(
       });
     }
 
-    const offer = await prisma.recoveryOffer.findUnique({
+    const updatedOffer = await prisma.recoveryOffer.findUnique({
       where: { id: offer_id },
       include: { customer: true },
     });
 
-    if (!offer) {
+    if (!updatedOffer) {
       return res.status(404).json({ error: 'Offer not found' });
     }
 
-    const discountedAmount = Math.round(
-      offer.amount_paise * (1 - offer.discount_percent / 100)
+    const discountedAmount = updatedOffer.settled_amount_paise || Math.round(
+      updatedOffer.amount_paise * (1 - updatedOffer.discount_percent / 100)
     );
 
     // 2. Update parent opportunity if exists
-    if (offer.opportunity_id) {
+    if (updatedOffer.opportunity_id) {
       await prisma.recoveryOpportunity.update({
-        where: { id: offer.opportunity_id },
+        where: { id: updatedOffer.opportunity_id },
         data: { status: 'RECOVERED', resolved_at: new Date() },
       });
     }
 
     // 3. Append settlement to audit log
     auditLogger.appendSettlement({
-      offer_id: offer.id,
-      opportunity_id: offer.opportunity_id || undefined,
-      payment_link_id: offer.razorpay_payment_link_id || undefined,
+      offer_id: updatedOffer.id,
+      opportunity_id: updatedOffer.opportunity_id || undefined,
+      payment_link_id: updatedOffer.razorpay_payment_link_id || undefined,
       settled_amount_paise: discountedAmount,
-      customer_id: offer.customer_id,
-      action_type: offer.action_type,
-      opportunity_type: offer.opportunity_type || "abandoned_checkout",
-      discount_percent: offer.discount_percent,
-      mode: offer.execution_mode === "LIVE" ? "live" : "simulated",
+      customer_id: updatedOffer.customer_id,
+      action_type: updatedOffer.action_type,
+      opportunity_type: updatedOffer.opportunity_type || "abandoned_checkout",
+      discount_percent: updatedOffer.discount_percent,
+      mode: updatedOffer.execution_mode === "LIVE" ? "live" : "simulated",
     });
 
     return res.json({
       status: "settled",
-      offer_id: offer.id,
+      offer_id: updatedOffer.id,
       recovered_value_paise: discountedAmount,
       simulation: true,
     });
