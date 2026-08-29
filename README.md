@@ -77,7 +77,7 @@ Both gateways implement `IExecutionGateway` and are injected into the orchestrat
 
 ### Stage 5 — Settlement & Audit
 
-- **Razorpay Webhooks** — `payment_link.paid` and `payment.captured` events are received, HMAC-verified against raw request bytes (not re-serialized JSON), and the corresponding `RecoveryOffer` record is updated to `redeemed` status.
+- **Razorpay Webhooks** — `payment_link.paid` and `payment.captured` events are received, HMAC-verified against raw request bytes (not re-serialized JSON), and the corresponding `RecoveryOffer` record is updated to `RECOVERED` status.
 
 - **SHA-256 Audit Ledger** — Every pipeline action (approved or blocked) is appended to a JSONL file as a hash-chained record. Each record's hash = `SHA-256(previous_hash + canonical_json(record))`. Canonical JSON sorts keys deterministically and strips `undefined` properties. The chain can be independently verified at any time to detect tampering.
 

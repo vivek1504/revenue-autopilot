@@ -37,7 +37,7 @@ export const Stage3Policy: React.FC<Stage3PolicyProps> = ({
                 Stage 3: Deterministic Safety Guard & Policy Enforcement
               </h3>
               <p className="text-xs text-slate-500">
-                Hard-coded mathematical bounds check discount caps (&le;15%), link lifespans (&le;72h), and prompt-injection override attempts.
+                Hard-coded mathematical bounds check discount caps (&le;15%), link lifespans (&le;72h), and unauthorized override attempts.
               </p>
             </div>
           </div>

@@ -75,7 +75,7 @@ export const Stage1Discovery: React.FC<Stage1DiscoveryProps> = ({
             </p>
           </div>
           <span className="text-xs font-semibold px-2.5 py-1 bg-white border border-slate-200 rounded text-slate-700 font-mono">
-            {items.length} Ingested Accounts
+            {items.length} Ingested Opportunities
           </span>
         </div>
 
