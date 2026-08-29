@@ -121,34 +121,20 @@ export function createWebhookRouter(
 
         const settledOffer = settledOffers[0];
         const targetCustomerId = settledOffer?.customer_id || customerId;
-        if (targetCustomerId) {
+        if (targetCustomerId && settledOffer) {
           const settledAmount = paymentEntity?.amount ||
-            (settledOffer
-              ? Math.round(settledOffer.amount_paise * (1 - (settledOffer.discount_percent || 0) / 100))
-              : 0);
+            Math.round(settledOffer.amount_paise * (1 - (settledOffer.discount_percent || 0) / 100));
 
-          const settlementProposal: AgentProposal = {
+          auditLogger.appendSettlement({
+            offer_id: settledOffer.id,
+            opportunity_id: settledOffer.opportunity_id || undefined,
+            payment_link_id: paymentLinkId,
+            settled_amount_paise: settledAmount,
             customer_id: targetCustomerId,
-            action: (settledOffer?.action_type as any) || 'discounted_payment_link',
-            amount_paise: settledAmount,
-            discount_percent: settledOffer?.discount_percent || 0,
-            expiry_hours: 0,
-            reason: `Webhook verified payment link redemption event: ${event}${settledOffer ? ` for offer ${settledOffer.id}` : ''}`,
-            opportunity_type: (settledOffer?.opportunity_type as any) || 'abandoned_checkout',
-            evidence: {},
-          };
-
-          const policyResult: PolicyResult = {
-            verdict: 'APPROVED',
-            proposal: settlementProposal,
-            violations: [],
-            checked_at: new Date().toISOString(),
-          };
-
-          auditLogger.append(settlementProposal, policyResult, {
+            action_type: settledOffer.action_type,
+            opportunity_type: settledOffer.opportunity_type || 'abandoned_checkout',
+            discount_percent: settledOffer.discount_percent || 0,
             mode: 'live',
-            razorpay_payment_link_id: paymentLinkId,
-            idempotency_key: `webhook_redeemed_${paymentLinkId}`,
           });
         }
       }

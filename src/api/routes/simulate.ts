@@ -65,28 +65,16 @@ export function createSimulateRouter(
     }
 
     // 3. Append settlement to audit log
-    const settlementProposal: AgentProposal = {
+    auditLogger.appendSettlement({
+      offer_id: offer.id,
+      opportunity_id: offer.opportunity_id || undefined,
+      payment_link_id: offer.razorpay_payment_link_id || undefined,
+      settled_amount_paise: discountedAmount,
       customer_id: offer.customer_id,
-      action: offer.action_type as any,
-      amount_paise: discountedAmount,
+      action_type: offer.action_type,
+      opportunity_type: offer.opportunity_type || "abandoned_checkout",
       discount_percent: offer.discount_percent,
-      expiry_hours: 0,
-      reason: "Simulated payment settlement verified for offer " + offer.id,
-      opportunity_type: (offer.opportunity_type as any) || "abandoned_checkout",
-      evidence: {},
-    };
-
-    const settlementVerdict: PolicyResult = {
-      verdict: "APPROVED",
-      proposal: settlementProposal,
-      violations: [],
-      checked_at: new Date().toISOString(),
-    };
-
-    auditLogger.append(settlementProposal, settlementVerdict, {
       mode: offer.execution_mode === "LIVE" ? "live" : "simulated",
-      razorpay_payment_link_id: offer.razorpay_payment_link_id || undefined,
-      idempotency_key: "sim_settle_" + offer.id + "_" + Date.now(),
     });
 
     return res.json({
