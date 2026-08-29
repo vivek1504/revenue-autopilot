@@ -250,7 +250,7 @@ async function runDemo() {
   console.log('================================================================');
   console.log(` Total Opportunities Scanned:  ${result.total_opportunities}`);
   console.log(` Policy Approved Actions:       ${result.approved_count} (Created Live Razorpay Links)`);
-  console.log(` Policy Blocked Violations:     ${result.blocked_count} (Adversarial & Stopping Rules)`);
+  console.log(` Policy Blocked Violations:     ${result.blocked_count} (Policy Violations & Stopping Rules)`);
   console.log(` Recoverable Revenue:           ₹${(result.approved_value_paise / 100).toLocaleString('en-IN')}`);
   console.log(` Unsafe Value Blocked:          ₹${(result.unsafe_value_blocked_paise / 100).toLocaleString('en-IN')}`);
   console.log(` Cryptographic SHA-256 Chain:  ${auditCheck.valid ? '✅ VERIFIED INTACT' : '❌ CORRUPTED'} (${auditCheck.verified_records} records)`);

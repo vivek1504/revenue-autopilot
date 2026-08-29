@@ -11,9 +11,13 @@ export interface CustomerOpportunity {
   existingOffers: RecoveryOffer[];
 }
 
+const STRATEGY_COOLDOWNS: Record<string, number> = {
+  PREMIUM_UPSELL: 30,
+  WINBACK: 30,
+};
+
 export async function detectOpportunities(prisma: PrismaClient): Promise<CustomerOpportunity[]> {
   const opportunities: CustomerOpportunity[] = [];
-  const processedCustomerIds = new Set<string>();
 
   const parseItems = (raw: any) => {
     if (typeof raw === 'string') {
@@ -27,7 +31,6 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
   };
 
   const now = new Date();
-  const currentWindow = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
   const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -53,7 +56,6 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
 
   for (const cartRow of abandonedCarts) {
     const customer = mapCustomer(cartRow.customer);
-    if (processedCustomerIds.has(customer.id)) continue;
 
     const idempotencyKey = `ABANDONED_CART:${cartRow.id}`;
     let oppRecord = await prisma.recoveryOpportunity.findUnique({
@@ -106,7 +108,6 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
       completedOrders,
       existingOffers,
     });
-    processedCustomerIds.add(customer.id);
   }
 
   // 2. Failed Payments (within last 48h)
@@ -130,7 +131,6 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
 
   for (const orderRow of failedPaymentOrders) {
     const customer = mapCustomer(orderRow.customer);
-    if (processedCustomerIds.has(customer.id)) continue;
 
     const idempotencyKey = `FAILED_PAYMENT:${orderRow.id}`;
     let oppRecord = await prisma.recoveryOpportunity.findUnique({
@@ -172,10 +172,9 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
       completedOrders,
       existingOffers,
     });
-    processedCustomerIds.add(customer.id);
   }
 
-  // 3. Upsell Candidates (3+ completed orders, VIP/premium tier)
+  // 3. Upsell Candidates (3+ completed orders, VIP/premium tier, explicit 30-day cooldown)
   const upsellCandidates = await prisma.customer.findMany({
     where: {
       total_orders: { gte: 3 },
@@ -192,14 +191,25 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
     },
   });
 
+  const upsellCooldownDays = STRATEGY_COOLDOWNS['PREMIUM_UPSELL'] || 30;
+  const upsellCooldownStart = new Date(now.getTime() - upsellCooldownDays * 24 * 60 * 60 * 1000);
+
   for (const custRow of upsellCandidates) {
     const customer = mapCustomer(custRow);
-    if (processedCustomerIds.has(customer.id)) continue;
 
-    const idempotencyKey = `UPSELL:${customer.id}:${currentWindow}`;
-    let oppRecord = await prisma.recoveryOpportunity.findUnique({
-      where: { idempotency_key: idempotencyKey },
+    const recentUpsell = await prisma.recoveryOpportunity.findFirst({
+      where: {
+        customer_id: customer.id,
+        type: 'UPSELL',
+        detected_at: { gte: upsellCooldownStart },
+      },
     });
+    if (recentUpsell && recentUpsell.status !== 'OPEN') continue;
+
+    const idempotencyKey = `UPSELL:${customer.id}:${now.toISOString().slice(0, 10)}`;
+    let oppRecord = recentUpsell || (await prisma.recoveryOpportunity.findUnique({
+      where: { idempotency_key: idempotencyKey },
+    }));
 
     if (!oppRecord) {
       const completed = await getCompletedOrders(prisma, customer.id);
@@ -240,10 +250,9 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
       completedOrders,
       existingOffers,
     });
-    processedCustomerIds.add(customer.id);
   }
 
-  // 4. Re-engagement (inactive >30 days, 2+ prior orders)
+  // 4. Re-engagement (inactive >30 days, 2+ prior orders, explicit 30-day cooldown)
   const reengagementCandidates = await prisma.customer.findMany({
     where: {
       total_orders: { gte: 2 },
@@ -257,14 +266,25 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
     },
   });
 
+  const winbackCooldownDays = STRATEGY_COOLDOWNS['WINBACK'] || 30;
+  const winbackCooldownStart = new Date(now.getTime() - winbackCooldownDays * 24 * 60 * 60 * 1000);
+
   for (const custRow of reengagementCandidates) {
     const customer = mapCustomer(custRow);
-    if (processedCustomerIds.has(customer.id)) continue;
 
-    const idempotencyKey = `REENGAGEMENT:${customer.id}:${currentWindow}`;
-    let oppRecord = await prisma.recoveryOpportunity.findUnique({
-      where: { idempotency_key: idempotencyKey },
+    const recentWinback = await prisma.recoveryOpportunity.findFirst({
+      where: {
+        customer_id: customer.id,
+        type: 'REENGAGEMENT',
+        detected_at: { gte: winbackCooldownStart },
+      },
     });
+    if (recentWinback && recentWinback.status !== 'OPEN') continue;
+
+    const idempotencyKey = `REENGAGEMENT:${customer.id}:${now.toISOString().slice(0, 10)}`;
+    let oppRecord = recentWinback || (await prisma.recoveryOpportunity.findUnique({
+      where: { idempotency_key: idempotencyKey },
+    }));
 
     if (!oppRecord) {
       try {
@@ -300,7 +320,6 @@ export async function detectOpportunities(prisma: PrismaClient): Promise<Custome
       completedOrders,
       existingOffers,
     });
-    processedCustomerIds.add(customer.id);
   }
 
   return opportunities;
