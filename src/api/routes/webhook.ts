@@ -78,46 +78,45 @@ export function createWebhookRouter(
       const notes = paymentEntity?.notes || {};
       const customerId = notes.customer_id;
 
-      if (paymentLinkId || customerId) {
-        // Find matching offers
-        const whereConditions: any[] = [];
-        if (paymentLinkId)
-          whereConditions.push({ razorpay_payment_link_id: paymentLinkId });
-        if (customerId)
-          whereConditions.push({
-            customer_id: customerId,
-            status: { in: ['DISPATCHED', 'PENDING', 'sent', 'pending'] },
+      if (!paymentLinkId) {
+        console.warn('⚠️ [Webhook] No payment_link_id found in payload');
+        return res
+          .status(200)
+          .json({ status: 'ok', event, note: 'No payment_link_id to match' });
+      }
+
+      // Atomic conditional update on exact payment_link_id
+      const updateResult = await prisma.recoveryOffer.updateMany({
+        where: {
+          razorpay_payment_link_id: paymentLinkId,
+          status: { in: ['DISPATCHED', 'sent', 'pending', 'PENDING'] },
+        },
+        data: { status: 'RECOVERED' },
+      });
+
+      if (updateResult.count > 0) {
+        const settledOffers = await prisma.recoveryOffer.findMany({
+          where: { razorpay_payment_link_id: paymentLinkId, status: 'RECOVERED' },
+          select: { id: true, opportunity_id: true, customer_id: true, amount_paise: true },
+        });
+
+        const oppIds = settledOffers
+          .map((o) => o.opportunity_id)
+          .filter((id): id is string => Boolean(id));
+
+        if (oppIds.length > 0) {
+          await prisma.recoveryOpportunity.updateMany({
+            where: { id: { in: oppIds } },
+            data: { status: 'RECOVERED', resolved_at: new Date() },
           });
-
-        if (whereConditions.length > 0) {
-          const matchingOffers = await prisma.recoveryOffer.findMany({
-            where: { OR: whereConditions },
-            select: { id: true, opportunity_id: true, customer_id: true },
-          });
-
-          await prisma.recoveryOffer.updateMany({
-            where: { id: { in: matchingOffers.map((o) => o.id) } },
-            data: { status: 'RECOVERED' },
-          });
-
-          const oppIds = matchingOffers
-            .map((o) => o.opportunity_id)
-            .filter((id): id is string => Boolean(id));
-
-          if (oppIds.length > 0) {
-            await prisma.recoveryOpportunity.updateMany({
-              where: { id: { in: oppIds } },
-              data: { status: 'RECOVERED', resolved_at: new Date() },
-            });
-          }
         }
 
-        // Audit record for redeemed offer
-        if (customerId) {
+        const targetCustomerId = settledOffers[0]?.customer_id || customerId;
+        if (targetCustomerId) {
           const mockProposal: AgentProposal = {
-            customer_id: customerId,
+            customer_id: targetCustomerId,
             action: 'discounted_payment_link',
-            amount_paise: paymentEntity.amount || 0,
+            amount_paise: paymentEntity.amount || settledOffers[0]?.amount_paise || 0,
             discount_percent: 0,
             expiry_hours: 24,
             reason: `Webhook verified payment link redemption event: ${event}`,
@@ -135,7 +134,7 @@ export function createWebhookRouter(
           auditLogger.append(mockProposal, policyResult, {
             mode: 'live',
             razorpay_payment_link_id: paymentLinkId,
-            idempotency_key: `webhook_redeemed_${paymentLinkId || Date.now()}`,
+            idempotency_key: `webhook_redeemed_${paymentLinkId}`,
           });
         }
       }
