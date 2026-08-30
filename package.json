@@ -5,8 +5,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "start:api": "tsx src/api/server.ts",
+    "start:api": "tsx watch src/api/server.ts",
     "dashboard": "npm --prefix dashboard run dev",
+    "evaluate": "tsx evaluation/runner.ts",
     "benchmark": "tsx scripts/run-benchmark.ts",
     "seed": "tsx scripts/seed-data.ts",
     "seed:small": "tsx scripts/seed-small.ts",
