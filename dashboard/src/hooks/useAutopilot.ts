@@ -22,6 +22,8 @@ export function useAutopilot() {
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditRecord[]>([]);
   const [verificationResult, setVerificationResult] = useState<AuditVerificationResult | null>(null);
+  const [benchmarkReport, setBenchmarkReport] = useState<any>(null);
+  const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [totalOpportunities, setTotalOpportunities] = useState<number>(0);
 
@@ -177,6 +179,33 @@ export function useAutopilot() {
       console.error('Export failed:', err);
     }
   }, []);
+  const fetchBenchmarkReport = useCallback(async () => {
+    try {
+      const res = await fetch('/api/evaluate/report');
+      if (res.ok) {
+        const data = await res.json();
+        setBenchmarkReport(data);
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch benchmark report:', err);
+    }
+  }, []);
+
+  const runBenchmark = useCallback(async () => {
+    setIsEvaluating(true);
+    try {
+      const res = await fetch('/api/evaluate/run', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setBenchmarkReport(data);
+        return data;
+      }
+    } catch (err: any) {
+      console.error('Failed to run benchmark evaluation:', err);
+    } finally {
+      setIsEvaluating(false);
+    }
+  }, []);
 
   const refreshAll = useCallback(() => {
     fetchOpportunitiesQueue();
@@ -186,8 +215,9 @@ export function useAutopilot() {
     fetchBenchmarks();
     fetchSettings();
     fetchAuditLogs();
+    fetchBenchmarkReport();
     runVerification();
-  }, [fetchOpportunitiesQueue, fetchSummary, fetchTimeseries, fetchCohorts, fetchBenchmarks, fetchSettings, fetchAuditLogs, runVerification]);
+  }, [fetchOpportunitiesQueue, fetchSummary, fetchTimeseries, fetchCohorts, fetchBenchmarks, fetchSettings, fetchAuditLogs, fetchBenchmarkReport, runVerification]);
 
   const run = useCallback(async (mode: 'simulated' | 'live' = 'simulated') => {
     setStatus('running');
@@ -305,9 +335,12 @@ export function useAutopilot() {
     settings,
     auditLogs,
     verificationResult,
+    benchmarkReport,
+    isEvaluating,
     totalOpportunities,
     error,
     run,
+    runBenchmark,
     runVerification,
     tamperRecord,
     simulatePayment,

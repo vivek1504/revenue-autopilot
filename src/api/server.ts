@@ -12,6 +12,7 @@ import { createAutopilotRouter } from './routes/autopilot';
 import { createAuditRouter } from './routes/audit';
 import { createWebhookRouter } from './routes/webhook';
 import { createSimulateRouter } from './routes/simulate';
+import { createEvaluateRouter } from './routes/evaluate';
 
 export { autopilotEmitter };
 
@@ -38,9 +39,10 @@ app.use('/api/autopilot', createAutopilotRouter());
 app.use('/api/audit', createAuditRouter());
 app.use('/api/webhook', createWebhookRouter(prisma, rzpClient, auditLogger));
 app.use('/api/simulate', createSimulateRouter(prisma, auditLogger));
+app.use('/api/evaluate', createEvaluateRouter());
 
 export function startServer(port: number = config.server.port) {
-  return app.listen(port, () => {
+  return app.listen(port, '0.0.0.0', () => {
     console.log(`🚀 Revenue Autopilot API Server running at http://localhost:${port}`);
   });
 }

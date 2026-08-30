@@ -20,6 +20,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
     pipelines: 'Autonomous Pipeline',
     audit: 'Audit Log & Ledger',
     recoveries: 'Recoveries & Analytics',
+    benchmark: 'Recovery Benchmark & Comparison',
     telemetry: 'Observability & Safety',
     settings: 'Settings & Policy',
   };
