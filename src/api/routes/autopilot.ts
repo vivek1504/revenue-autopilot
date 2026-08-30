@@ -10,6 +10,7 @@ export function createAutopilotRouter(): Router {
   const router = Router();
 
   router.post('/run', async (req: Request, res: Response): Promise<any> => {
+    console.log("autopilot triggered")
     if (isAutopilotRunning) {
       return res.status(409).json({
         status: 'busy',
@@ -40,11 +41,13 @@ export function createAutopilotRouter(): Router {
   });
 
   router.get('/events', (req: Request, res: Response) => {
+    console.log('[Autopilot SSE] Client connected to events stream');
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
     if (res.flushHeaders) res.flushHeaders();
+    res.write(': connected\n\n');
 
     const listener = (event: AutopilotEvent) => {
       res.write(`data: ${JSON.stringify(event)}\n\n`);
