@@ -12,12 +12,14 @@ import {
   Download,
   X,
   Radio,
+  Scale,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type NavTab =
   | 'dashboard'
   | 'recoveries'
+  | 'benchmark'
   | 'telemetry'
   | 'pipelines'
   | 'audit'
@@ -53,6 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'pipelines' as NavTab, label: 'Autonomous Pipeline', icon: GitFork },
     { id: 'audit' as NavTab, label: 'Audit Log & Ledger', icon: History },
     { id: 'recoveries' as NavTab, label: 'Recoveries & Analytics', icon: CreditCard },
+    { id: 'benchmark' as NavTab, label: 'Recovery Benchmark', icon: Scale },
     { id: 'telemetry' as NavTab, label: 'Observability & Safety', icon: Bot },
     { id: 'settings' as NavTab, label: 'Settings & Policy', icon: Settings },
   ];

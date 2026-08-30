@@ -14,6 +14,7 @@ import {
   HelpCircle,
   Database,
   ArrowRight,
+  Scale,
 } from 'lucide-react';
 import {
   AutopilotEvent,
@@ -88,6 +89,13 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
   const expansionPaise = summary?.expansion_opportunity_paise || 0;
   const blockedPaise = summary?.unsafe_value_blocked_paise || 0;
 
+  const recoveredItems = items.filter((i) => i.offerStatus === 'RECOVERED');
+  const discountCostPaise = recoveredItems.reduce((acc, curr) => {
+    const original = curr.proposal.amount_paise || 0;
+    const net = Math.round(original * (1 - (curr.proposal.discount_percent || 0) / 100));
+    return acc + (original - net);
+  }, 0);
+
   const chartPoints: TimeSeriesPoint[] =
     timeseries && timeseries.length > 0 ? timeseries : [];
 
@@ -113,6 +121,13 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
 
         <div className="flex items-center gap-2.5">
           <button
+            onClick={() => onNavigateToTab('benchmark')}
+            className="px-3.5 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 rounded-lg hover:bg-emerald-100 transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+          >
+            <Scale className="w-3.5 h-3.5 text-emerald-700" />
+            <span>Recovery Benchmark</span>
+          </button>
+          <button
             onClick={() => onNavigateToTab('pipelines')}
             className="px-3.5 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
           >
@@ -131,12 +146,12 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
 
       {/* 2. Top-Level Executive KPI Ribbon (5 Authoritative Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-        {/* Card 1: Recovered Revenue */}
+        {/* Card 1: Net Recovered Revenue */}
         <MetricCard
-          label="Recovered Revenue"
+          label="Net Recovered Revenue"
           value={formatRupees(recoveredPaise)}
           valueColor="text-emerald-700"
-          subLabel="Verified settlements"
+          subLabel={discountCostPaise > 0 ? `Gross ${formatRupees(recoveredPaise + discountCostPaise)} (-${formatRupees(discountCostPaise)} disc)` : "Verified settlements"}
           subValue={`${summary?.recovered_count || 0} Settled`}
           subValueColor="text-emerald-800"
           icon={CheckCircle2}
