@@ -1,354 +1,246 @@
+<div align="center">
+
+<img src="https://razorpay.com/favicon.ico" alt="Revenue Autopilot Logo" width="64" height="64" />
+
 # Revenue Autopilot
 
-An autonomous AI agent system that detects lost revenue opportunities across a merchant's e-commerce data—abandoned checkouts, failed payments, lapsed customers—and autonomously generates, policy-gates, and executes recovery actions through Razorpay payment links, all under a cryptographically verifiable audit trail.
+*Autonomous AI revenue recovery pipeline with policy safety guardrails and cryptographic audit trail.*
 
-Built with **Gemini 3.6 Flash** · **Razorpay Payment Links API** · **Prisma ORM 7** · **React 19**
+[![Tests](https://img.shields.io/badge/Tests-38%20Passing-success?style=flat-square&logo=vitest&logoColor=white)](tests/)
+![Node Version](https://img.shields.io/badge/Node.js->=20-3c873a?style=flat-square&logo=node.js&logoColor=white)
+[![TypeScript](https://img.shields.io/badge/TypeScript-7.0-blue?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Gemini](https://img.shields.io/badge/LLM-Gemini%203.6%20Flash-8e75ff?style=flat-square&logo=google)](https://ai.google.dev/)
+[![Razorpay](https://img.shields.io/badge/Payments-Razorpay%20API-0c2340?style=flat-square&logo=razorpay)](https://razorpay.com)
+[![Prisma](https://img.shields.io/badge/ORM-Prisma%207-2d3748?style=flat-square&logo=prisma)](https://www.prisma.io)
+[![React](https://img.shields.io/badge/Frontend-React%2019-61dafb?style=flat-square&logo=react&logoColor=black)](https://react.dev)
+
+⭐ If you find this project useful, please consider giving it a star on GitHub!
+
+[Overview](#overview) • [Pipeline Architecture](#pipeline-architecture) • [Features](#features) • [Getting Started](#getting-started) • [Dashboard](#dashboard) • [Policy Engine](#policy-engine) • [Audit Ledger](#cryptographic-audit-ledger) • [API Reference](#api-reference) • [Testing](#testing)
+
+</div>
 
 ---
 
-## How It Works
+## Overview
 
-Revenue Autopilot operates as a **5-stage pipeline** where every customer opportunity flows through each stage sequentially. No action reaches the customer without passing all five gates.
+**Revenue Autopilot** is an autonomous AI agent system designed to detect and recover lost revenue across e-commerce operations. It continuously scans merchant databases for revenue leakages—such as abandoned checkouts, failed payments, lapsed high-value customers, and post-purchase upsell opportunities—generates context-aware recovery proposals using **Gemini 3.6 Flash**, policy-gates every proposal against **13 deterministic safety rules**, and dispatches targeted **Razorpay Payment Links**, all anchored by a tamper-evident **SHA-256 hash-chained audit ledger**.
+
+> [!TIP]
+> You can run and test the entire system locally with zero external API dependencies using the built-in **`simulated`** execution mode.
+
+---
+
+## Pipeline Architecture
+
+Revenue Autopilot processes every recovery candidate through a **5-stage sequential pipeline**. No action reaches a customer without passing all validation gates.
 
 ```
-┌─────────────┐    ┌─────────────┐    ┌──────────────┐    ┌─────────────┐    ┌──────────────┐
-│  1. DETECT  │───▶│ 2. PROPOSE  │───▶│  3. POLICY   │───▶│ 4. EXECUTE  │───▶│  5. SETTLE   │
-│  Discovery  │    │  LLM Agent  │    │    Engine     │    │   Gateway   │    │  Audit + Pay │
-└─────────────┘    └─────────────┘    └──────────────┘    └─────────────┘    └──────────────┘
- Scan database      Gemini 3.6         13 safety rules     Razorpay API       SHA-256 chain
- for revenue         generates          evaluate every      creates live       + webhook
- opportunities       proposals          proposal            payment links      verification
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   1. DISCOVER   │───▶│   2. PROPOSE    │───▶│    3. POLICY    │───▶│   4. EXECUTE    │───▶│   5. SETTLE     │
+│ Database Scan   │    │  Gemini Agent   │    │  Safety Engine  │    │ Payment Gateway │    │ Audit & Webhook │
+└─────────────────┘    └─────────────────┘    └─────────────────┘    └─────────────────┘    └─────────────────┘
+ Scans PostgreSQL       Generates context-     Evaluates 13 hard      Dispatches live      HMAC-verifies
+ for 4 opportunity      rich recovery          safety rules           Razorpay payment     webhooks & records
+ classes                proposals (Zod)        simultaneously         links / orders       SHA-256 hash chain
 ```
 
-### Stage 1 — Discovery
+### Stage 1: Discovery
+Scans the PostgreSQL database for revenue opportunities across four distinct segments:
+- **Abandoned Checkout**: Shopping carts with `abandoned` status and inactivity $> 1$ hour.
+- **Failed Payment**: Orders with `failed` status within the last 48 hours.
+- **High-Value Upsell**: Customers in `premium` or `vip` tiers with 3+ completed orders.
+- **Re-engagement (Winback)**: Inactive customers with 2+ historical purchases and no activity in $> 30$ days.
 
-Scans the PostgreSQL database for four classes of revenue opportunities:
+### Stage 2: Proposal Generation
+Uses a **Strategy Pattern** with two interchangeable engines:
+- **`GeminiProposer`**: Leverages Gemini 3.6 Flash with structured JSON output and strict Zod schema validation (`AgentProposalSchema`). Automatically falls back to heuristics upon API timeouts or errors.
+- **`HeuristicProposer`**: Deterministic rule-based proposer for offline simulations, CI/CD, and testing.
 
-| Opportunity Type    | Detection Logic                                           |
-|---------------------|-----------------------------------------------------------|
-| Abandoned Checkout  | Cart status = `abandoned`, last activity > 1 hour ago     |
-| Failed Payment      | Order status = `failed`, created within last 48 hours     |
-| Upsell              | Customer tier ∈ {`premium`, `vip`}, 3+ completed orders  |
-| Re-engagement       | Last purchase > 30 days ago, 2+ prior orders              |
+### Stage 3: Policy Engine
+Evaluates every proposal against **13 non-short-circuiting safety rules**. All rules run concurrently to collect comprehensive diagnostic reports for merchant oversight.
 
-Each opportunity bundles the full customer profile, cart contents, order history, and any existing recovery offers—giving the LLM (or heuristic fallback) complete context for its proposal.
+### Stage 4: Execution Gateway
+Dispatches recovery actions via pluggable gateway strategies:
+- **`RazorpayGateway`**: Creates live Razorpay Orders and Payment Links with idempotency deduplication and an automated live link budget safety cap.
+- **`SimulatedGateway`**: Emulates payment link creation with zero external network calls.
 
-### Stage 2 — Proposal Generation
+### Stage 5: Settlement & Cryptographic Audit
+- **Webhook Processing**: Ingests raw-byte HMAC-verified Razorpay webhooks (`payment_link.paid`, `payment.captured`) to reconcile orders to `RECOVERED` state.
+- **SHA-256 Audit Trail**: Appends canonical JSON records to an immutable, cryptographically verifiable hash chain ledger.
 
-The system uses a **Strategy Pattern** with two interchangeable proposers:
+---
 
-- **`GeminiProposer`** — Calls Gemini 3.6 Flash with structured JSON output schema. The model receives a system prompt defining it as a revenue recovery specialist, plus the full customer context. Responses are validated with Zod against `AgentProposalSchema`. Falls back to heuristics on API failure.
+## Features
 
-- **`HeuristicProposer`** — Deterministic rule-based proposer for simulated/offline runs. Maps opportunity types to predefined recovery actions (e.g., abandoned cart → discounted payment link with 5-10% off).
+- **Autonomous AI Decisioning** — Gemini 3.6 Flash formulates recovery strategies with strict JSON schema guarantees and factual evidence grounding.
+- **13-Rule Deterministic Policy Engine** — Guarantees financial limits, discount ceilings, contact rate stopping rules, and anti-hallucination evidence validation.
+- **Production-Grade Razorpay Integration** — Idempotent Payment Link generation, live link budget caps, and raw-buffer HMAC webhook verification.
+- **Cryptographic Audit Ledger** — Append-only JSONL hash chain (`SHA-256(previous_hash + canonical_json)`) with instant integrity verification and tamper detection.
+- **Interactive React 19 Dashboard** — Real-time telemetry, live SSE stream during autopilot runs, 5-stage pipeline stepper, and timeseries analytics.
+- **Dual Execution Strategy** — Instant toggling between offline simulated sandbox and live Razorpay/Gemini production environments.
 
-Every proposal includes: `customer_id`, `action`, `amount_paise`, `discount_percent`, `expiry_hours`, `confidence_score`, `reason`, `opportunity_type`, and an `evidence` object with factual metrics from the database.
+---
 
-### Stage 3 — Policy Engine
+## Getting Started
 
-**Every proposal is evaluated against all 13 rules.** The engine never short-circuits—it collects every violation so the dashboard can display the complete safety picture.
+### Prerequisites
 
-| Rule                    | What It Checks                                                                  |
-|-------------------------|---------------------------------------------------------------------------------|
-| `amount_limit`          | Amount ≤ ₹10,000 (configurable)                                                |
-| `discount_limit`        | Discount ≤ 15%                                                                  |
-| `customer_exists`       | Customer ID exists in database (DB query)                                       |
-| `duplicate_offer`       | No active offer for same customer in last 24 hours (DB query)                   |
-| `expiry_range`          | Expiry between 1–72 hours                                                       |
-| `action_allowed`        | Action type in allowed set                                                      |
-| `evidence_present`      | Evidence object contains at least one factual metric                            |
-| `evidence_consistent`   | Evidence values (lifetime spend, cart value) match database records (DB query)  |
-| `amount_positive`       | Non-reminder actions require positive amount                                    |
-| `discount_for_action`   | Reminders and retry links cannot include discounts                              |
-| `contact_frequency`     | ≤ 3 contacts per customer per 7-day window (stopping rule, DB query)            |
-| `human_escalation`      | Amount > ₹25,000 requires human approval (escalation gate)                     |
-| `confidence_threshold`  | Agent confidence ≥ 70%                                                          |
+- **Node.js** `>= 20.x`
+- **PostgreSQL** `15+` (local or managed instance)
+- **Google AI Studio API Key** (for Gemini LLM proposer)
+- **Razorpay Test Account** (for live payment link generation)
 
-Rules that query the database (`customer_exists`, `duplicate_offer`, `evidence_consistent`, `contact_frequency`) provide real-time safety validation, not just static limit checks.
+### Installation
 
-### Stage 4 — Execution Gateway
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/vivek1504/revenue-autopilot.git
+   cd razorpay
+   ```
 
-Another **Strategy Pattern** with two gateways:
+2. **Install dependencies:**
+   ```bash
+   npm install
+   npm --prefix dashboard install
+   ```
 
-- **`RazorpayGateway`** — Creates real Razorpay Orders + Payment Links via the official SDK. Includes idempotency key deduplication, a configurable live link budget cap (auto-falls back to simulation when budget exhausted), and discount calculation.
+3. **Configure environment variables:**
+   ```bash
+   cp .env.example .env
+   ```
+   Edit `.env` to configure your credentials:
+   ```env
+   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/revenue_autopilot?schema=public"
+   PORT=3001
+   RAZORPAY_KEY_ID="rzp_test_..."
+   RAZORPAY_KEY_SECRET="..."
+   RAZORPAY_WEBHOOK_SECRET="..."
+   GEMINI_API_KEY="..."
+   EXECUTION_MODE="simulated"
+   CALLBACK_BASE_URL="http://localhost:3001"
+   ```
 
-- **`SimulatedGateway`** — Returns deterministic simulated execution results with synthetic IDs. Zero external API calls. Used for development, testing, and demos.
+4. **Initialize database schema & seed data:**
+   ```bash
+   npx prisma db push
+   npm run seed
+   ```
 
-Both gateways implement `IExecutionGateway` and are injected into the orchestrator at runtime based on the execution mode.
+### Running the Application
 
-### Stage 5 — Settlement & Audit
+Start the backend API server and frontend dashboard in separate terminal sessions:
 
-- **Razorpay Webhooks** — `payment_link.paid` and `payment.captured` events are received, HMAC-verified against raw request bytes (not re-serialized JSON), and the corresponding `RecoveryOffer` record is updated to `RECOVERED` status.
+```bash
+# Terminal 1: Backend API Server
+npm run start:api
 
-- **SHA-256 Audit Ledger** — Every pipeline action (approved or blocked) is appended to a JSONL file as a hash-chained record. Each record's hash = `SHA-256(previous_hash + canonical_json(record))`. Canonical JSON sorts keys deterministically and strips `undefined` properties. The chain can be independently verified at any time to detect tampering.
+# Terminal 2: Dashboard Frontend
+npm run dashboard
+```
+
+- **Backend API**: `http://localhost:3001`
+- **Dashboard UI**: `http://localhost:3000`
+
+> [!NOTE]
+> You can also run the autopilot pipeline directly from the command line using `npm run dev`.
 
 ---
 
 ## Dashboard
 
-A React 19 single-page application with six views:
+The React 19 single-page application offers comprehensive visibility across operations:
 
-| View                | What It Shows                                                         |
-|---------------------|-----------------------------------------------------------------------|
-| **Executive**       | Revenue recovered, approval rate, live pipeline activity feed         |
-| **Recoveries**      | Per-offer detail table, cohort breakdown, recovery timeseries         |
-| **Telemetry**       | P99/avg latencies per stage, throughput, policy rule catch rates       |
-| **Pipelines**       | 5-stage stepper visualization with per-stage data for each offer      |
-| **Audit Ledger**    | Full audit log viewer, one-click chain verification, tamper testing   |
-| **Settings**        | Policy config editor, execution mode toggle, export controls          |
-
-The dashboard connects to the backend via REST API and receives real-time pipeline progress via SSE (Server-Sent Events) during autopilot runs.
-
----
-
-## Tech Stack
-
-| Layer        | Technology                                                           |
-|--------------|----------------------------------------------------------------------|
-| LLM          | Google Gemini 3.6 Flash (structured JSON output with Zod validation) |
-| Payments     | Razorpay Orders API + Payment Links API + Webhooks                   |
-| Database     | PostgreSQL with Prisma ORM 7 (`pg` driver adapter)                   |
-| Backend      | Express 5, TypeScript 7, Node.js                                     |
-| Frontend     | React 19, Tailwind CSS 4, Vite, Lucide icons                        |
-| Audit        | SHA-256 hash-chained JSONL ledger with canonical JSON serialization  |
-| Testing      | Vitest (unit), custom E2E simulation runner                          |
+| View | Capabilities |
+| :--- | :--- |
+| **Executive Overview** | Real-time aggregate net revenue recovered, approval rates, live activity feed, and one-click autopilot trigger. |
+| **Recovery Benchmark** | 3-tier comparative evaluation (Baseline vs Heuristic Rules vs Gemini Autopilot) measuring net recovered margin and safety. |
+| **Recoveries & Cohorts** | Tabular breakdown of recovery offers, settlement statuses, discount distributions, and conversion timeseries. |
+| **Agent Telemetry** | Stage-by-stage P99/avg latency metrics, throughput counters, and policy violation frequency charts. |
+| **Pipelines Stepper** | Granular 5-stage visualization inspecting input data, agent reasoning, policy evaluation, and gateway responses per offer. |
+| **Audit Ledger** | Full inspection of the append-only ledger, one-click hash chain verification, and interactive tamper simulation. |
+| **Settings** | Real-time adjustment of policy thresholds (max amount, discount ceiling, contact frequency limits, execution mode). |
 
 ---
 
-## Project Structure
+## Policy Engine
 
-```
-razorpay/
-├── src/
-│   ├── agent/                  # Proposal generation
-│   │   ├── detector.ts         # Opportunity discovery (DB queries)
-│   │   ├── geminiProposer.ts   # Gemini 3.6 Flash LLM proposer
-│   │   ├── simulatedProposer.ts # Deterministic heuristic proposer
-│   │   ├── prompts.ts          # LLM system + user prompt templates
-│   │   ├── schemas.ts          # Zod validation + Gemini response schema
-│   │   └── revenue-agent.ts    # Proposer facade
-│   ├── api/
-│   │   ├── server.ts           # Express server with raw body capture
-│   │   ├── dependencies.ts     # Prisma client singleton
-│   │   └── routes/
-│   │       ├── autopilot.ts    # POST /api/autopilot/run (SSE stream)
-│   │       ├── webhook.ts      # Razorpay webhook handler + HMAC verify
-│   │       ├── dashboard.ts    # GET /api/dashboard/summary
-│   │       ├── analytics.ts    # GET /api/analytics/timeseries
-│   │       ├── audit.ts        # Audit log + chain verification + tamper
-│   │       ├── telemetry.ts    # GET /api/telemetry
-│   │       ├── settings.ts     # Policy settings CRUD
-│   │       ├── opportunities.ts # GET /api/opportunities
-│   │       └── export.ts       # CSV/JSON export
-│   ├── audit/
-│   │   ├── logger.ts           # SHA-256 hash chain + canonical JSON
-│   │   └── verifier.ts         # Independent chain integrity verifier
-│   ├── autopilot/
-│   │   ├── orchestrator.ts     # Main 5-stage pipeline loop
-│   │   └── telemetry.ts        # Live telemetry stats accumulator
-│   ├── gateway/
-│   │   ├── razorpay-client.ts  # Razorpay SDK wrapper
-│   │   ├── razorpay-gateway.ts # Live gateway (Orders + Payment Links)
-│   │   ├── simulated-gateway.ts # Offline simulation gateway
-│   │   ├── action-gateway.ts   # Gateway facade
-│   │   ├── simulator.ts        # Simulated execution result generator
-│   │   └── idempotency.ts      # Idempotency key generator
-│   ├── interfaces/
-│   │   ├── proposer.ts         # IProposer strategy interface
-│   │   └── gateway.ts          # IExecutionGateway strategy interface
-│   ├── policy/
-│   │   ├── engine.ts           # Policy evaluation engine
-│   │   ├── config.ts           # Default merchant policy config
-│   │   └── rules.ts            # 13 individual rule implementations
-│   ├── services/
-│   │   ├── dashboard.service.ts # Dashboard aggregation queries
-│   │   ├── analytics.service.ts # Timeseries + cohort analytics
-│   │   └── telemetry.service.ts # Telemetry rule categorization
-│   └── shared/
-│       ├── config.ts           # Environment config loader
-│       └── types/              # Shared TypeScript type definitions
-├── dashboard/                  # React 19 SPA
-│   └── src/
-│       ├── App.tsx             # Root layout + view router
-│       ├── hooks/useAutopilot.ts # API client + SSE hook
-│       ├── types.ts            # Frontend type definitions
-│       └── components/
-│           ├── ExecutiveDashboardView.tsx
-│           ├── RecoveriesAnalyticsView.tsx
-│           ├── AgentTelemetryView.tsx
-│           ├── PipelinesView.tsx
-│           ├── AuditLogView.tsx
-│           ├── SettingsView.tsx
-│           ├── PolicyVerdictModal.tsx
-│           ├── Sidebar.tsx
-│           ├── TopNavBar.tsx
-│           └── pipelines/      # 5-stage pipeline visualizations
-│               ├── Stage1Discovery.tsx
-│               ├── Stage2Reasoning.tsx
-│               ├── Stage3Policy.tsx
-│               ├── Stage4Gateway.tsx
-│               ├── Stage5Settlement.tsx
-│               └── PipelinesStepper.tsx
-├── prisma/
-│   └── schema.prisma           # Database schema (5 models, indexed)
-├── tests/                      # Vitest unit & integration tests
-│   ├── policy-engine.test.ts
-│   ├── stopping-rules.test.ts
-│   ├── audit-verifier.test.ts
-│   ├── action-gateway.test.ts
-│   ├── agent-schema.test.ts
-│   └── pipeline-e2e.test.ts
-└── scripts/                    # CLI utilities
-    ├── seed-data.ts            # Seed database with sample data
-    ├── seed-small.ts           # Minimal seed for demos
-    ├── demo.ts                 # Live demo runner
-    ├── demo-verify.ts          # Post-demo verification
-    ├── test-simulated-e2e.ts   # Full simulated E2E test
-    ├── verify-audit.ts         # Standalone audit chain verifier
-    └── run-benchmark.ts        # Performance benchmark
-```
+Every candidate action is verified against 13 deterministic safety rules before execution:
+
+| Rule Name | Scope | Verification Type | Description |
+| :--- | :--- | :--- | :--- |
+| `amount_limit` | Financial | Static Policy | Caps automated transactions at configured threshold (default: ₹1,00,000). |
+| `discount_limit` | Financial | Static Policy | Limits maximum allowed discount percentage (default: $\le 15\%$). |
+| `customer_exists` | Entity | Live DB Query | Verifies target customer ID exists in the database. |
+| `duplicate_offer` | Frequency | Live DB Query | Prevents multiple active offers for the same customer within 24 hours. |
+| `expiry_range` | Operational | Static Policy | Enforces payment link lifespan between 1 and 72 hours. |
+| `action_allowed` | Action | Static Policy | Ensures proposed action is within the merchant's allowed action whitelist. |
+| `evidence_present` | Integrity | Static Policy | Rejects proposals lacking factual metric evidence. |
+| `evidence_consistent`| Anti-Hallucination | Live DB Query | Cross-checks agent's evidence (cart totals, lifetime spend) against real DB records. |
+| `amount_positive` | Financial | Static Policy | Ensures non-reminder actions specify a strictly positive monetary value. |
+| `discount_for_action`| Financial | Static Policy | Forbids discounts on reminders and retry links. |
+| `contact_frequency` | Stopping Rule | Live DB Query | Blocks outreach if customer received $\ge 3$ contacts in the past 7 days. |
+| `human_escalation` | Escalation Gate | Static Policy | Flags transactions $> ₹25,000$ for mandatory human manager approval. |
+| `confidence_threshold`| AI Safety | Static Policy | Requires agent confidence score $\ge 70\%$. |
 
 ---
 
-## Setup
+## Cryptographic Audit Ledger
 
-### Prerequisites
+Every event in the pipeline (proposals, policy verdicts, dispatches, settlements) is cryptographically locked into an immutable JSONL file (`data/audit.jsonl`):
 
-- Node.js 20+
-- PostgreSQL 15+ (running locally or remote)
-- Razorpay Test Mode account (for live mode)
-- Google AI Studio API key (for Gemini 3.6 Flash)
+$$\text{Record Hash} = \text{SHA-256}\left(\text{Previous Hash} + \text{Canonical JSON}(\text{Record})\right)$$
 
-### Installation
+- **Deterministic Serialization**: Custom canonical JSON serialization sorts keys alphabetically and removes `undefined` fields, guaranteeing consistent hashing across environments.
+- **Genesis Block**: Initiated with 64 zeros (`000000...000000`).
+- **Tamper Detection**: Modifying or removing any past entry invalidates all downstream hash pointers.
 
+Verify the audit ledger anytime via CLI:
 ```bash
-# Clone and install
-git clone https://github.com/vivek1504/revenue-autopilot.git
-cd razorpay
-npm install
-npm --prefix dashboard install
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your credentials
-
-# Setup database
-npx prisma db push
-
-# Seed sample data
-npm run seed
+npx tsx scripts/verify-audit.ts
 ```
-
-### Environment Variables
-
-```env
-# Database
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/revenue_autopilot?schema=public"
-
-# Server
-PORT=3001
-
-# Razorpay (test mode credentials)
-RAZORPAY_KEY_ID="rzp_test_..."
-RAZORPAY_KEY_SECRET="..."
-RAZORPAY_WEBHOOK_SECRET="..."
-
-# Gemini
-GEMINI_API_KEY="..."
-
-# Execution mode: 'live' (real APIs) or 'simulated' (offline)
-EXECUTION_MODE="simulated"
-```
-
-### Running
-
-```bash
-# Terminal 1: Backend API server
-npm run start:api
-
-# Terminal 2: Dashboard dev server
-npm run dashboard
-```
-
-Backend runs on `http://localhost:3001`, dashboard on `http://localhost:5173`.
 
 ---
 
-## Execution Modes
+## API Reference
 
-The system supports two execution modes, togglable from the dashboard sidebar or via `EXECUTION_MODE` env var:
-
-| Mode          | LLM Proposer         | Payment Gateway         | Use Case                           |
-|---------------|-----------------------|-------------------------|------------------------------------|
-| **Live**      | Gemini 3.6 Flash      | Razorpay Orders + Links | Production / demo with real APIs   |
-| **Simulated** | HeuristicProposer     | SimulatedGateway        | Development / testing / CI         |
-
-In **live mode**, the `RazorpayGateway` enforces a configurable link budget cap (default: 10). Once the budget is exhausted, it transparently falls back to simulation for remaining opportunities, preventing runaway API usage.
+| Method | Route | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/autopilot/run` | Triggers autopilot execution stream via Server-Sent Events (SSE). |
+| `GET` | `/api/dashboard/summary` | Retrieves aggregate metrics, recovery stats, and pipeline activity. |
+| `GET` | `/api/opportunities` | Returns detected opportunities with customer and cart context. |
+| `GET` | `/api/analytics/timeseries` | Fetches historical recovery and conversion analytics. |
+| `GET` | `/api/telemetry` | Provides stage latencies, execution throughput, and rule statistics. |
+| `GET` | `/api/evaluate/report` | Retrieves latest 3-tier recovery benchmark evaluation report. |
+| `POST` | `/api/evaluate/run` | Triggers on-demand benchmark evaluation simulation across all strategies. |
+| `GET` | `/api/audit/logs` | Fetches all recorded audit ledger entries. |
+| `POST` | `/api/audit/verify` | Validates complete SHA-256 hash chain integrity. |
+| `POST` | `/api/audit/tamper` | Injects synthetic tampering to test ledger verification (non-prod). |
+| `GET` | `/api/settings` | Retrieves current merchant policy parameters and execution mode. |
+| `PUT` | `/api/settings` | Updates policy limits and operational configurations. |
+| `GET` | `/api/export/:format` | Exports recovery data in `csv` or `json` formats. |
+| `POST` | `/api/webhook/razorpay` | Ingests HMAC-verified webhook events (`payment_link.paid`). |
+| `POST` | `/api/simulate/payment` | Simulates payment settlement for testing and demo flows. |
 
 ---
 
 ## Testing
 
-### Unit Tests
+The project includes an extensive automated test suite covering unit, integration, and end-to-end simulated execution paths:
 
 ```bash
+# Run Vitest test suite (38 tests across 11 suites)
 npm test
-```
 
-Runs 6 test suites (24 tests) covering:
-- Policy engine rule evaluation
-- Stopping rules (contact frequency, human escalation, confidence threshold)
-- Audit chain integrity verification and tamper detection
-- Gateway idempotency and execution modes
-- Agent proposal schema validation
-- Full pipeline E2E with in-memory audit
+# Run 3-tier recovery benchmark evaluation (Baseline vs Heuristics vs Gemini Autopilot)
+npm run evaluate
 
-### Simulated E2E
-
-```bash
+# Run full simulated end-to-end pipeline against test database
 npm run test:e2e-sim
+
+# Run pipeline performance benchmark
+npm run benchmark
+
+# Verify live or test Razorpay credentials
+npm run test-razorpay
 ```
-
-Runs the complete 5-stage pipeline end-to-end in simulated mode against a real database, verifying:
-1. Opportunity detection finds seeded data
-2. Proposals pass Zod schema validation
-3. Policy engine correctly blocks over-limit and policy-violating proposals
-4. Approved proposals create `RecoveryOffer` database records
-5. Audit chain integrity passes independent verification
-6. Telemetry metrics are populated with real measured values
-
----
-
-## API Endpoints
-
-| Method | Endpoint                      | Description                              |
-|--------|-------------------------------|------------------------------------------|
-| POST   | `/api/autopilot/run`          | Start autopilot scan (SSE stream)        |
-| GET    | `/api/dashboard/summary`      | Dashboard aggregate metrics              |
-| GET    | `/api/opportunities`          | List detected opportunities              |
-| GET    | `/api/analytics/timeseries`   | Recovery timeseries data                 |
-| GET    | `/api/telemetry`              | Pipeline latency & throughput metrics    |
-| GET    | `/api/audit/logs`             | Fetch audit ledger records               |
-| POST   | `/api/audit/verify`           | Verify audit chain integrity             |
-| POST   | `/api/audit/tamper`           | Tamper test (non-production only)        |
-| GET    | `/api/settings`               | Get current policy settings              |
-| PUT    | `/api/settings`               | Update policy settings                   |
-| GET    | `/api/export/:format`         | Export data as CSV or JSON               |
-| POST   | `/api/webhook/razorpay`       | Razorpay webhook receiver (HMAC-gated)   |
-| GET    | `/api/webhook/razorpay`       | Payment success redirect page            |
-| POST   | `/api/simulate/payment`       | Simulate payment settlement (Sandbox)    |
-
----
-
-## Key Design Decisions
-
-1. **Strategy Pattern over mode switches** — `IProposer` and `IExecutionGateway` interfaces allow swapping implementations without touching the orchestrator. The pipeline loop has zero `if (mode === 'live')` checks.
-
-2. **Never short-circuit policy evaluation** — All 13 rules run on every proposal. This is deliberate: the dashboard needs the complete violation set for every proposal.
-
-3. **Canonical JSON for audit hashing** — `canonicalJsonStringify` sorts object keys alphabetically and strips `undefined` properties. This ensures `SHA-256(written_record) === SHA-256(parsed_record)` regardless of property insertion order.
-
-4. **Raw body webhook verification** — Express captures the raw byte buffer before JSON parsing via `express.json({ verify: (req, res, buf) => { req.rawBody = buf; } })`. This prevents HMAC failures from whitespace/encoding differences.
-
-5. **Idempotency keys** — Generated from `customer_id + action + amount`, preventing duplicate payment links even if the autopilot scans the same customer twice in a session.
-
----

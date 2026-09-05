@@ -8,6 +8,7 @@ import { AgentTelemetryView } from './components/AgentTelemetryView';
 import { PipelinesView } from './components/PipelinesView';
 import { AuditLogView } from './components/AuditLogView';
 import { SettingsView } from './components/SettingsView';
+import { RunReportView } from './components/RunReportView';
 import { PolicyVerdictModal } from './components/PolicyVerdictModal';
 import { ProcessedAction } from './types';
 
@@ -23,8 +24,11 @@ export function App() {
     settings,
     auditLogs,
     verificationResult,
+    benchmarkReport,
+    isEvaluating,
     totalOpportunities,
     run,
+    runBenchmark,
     runVerification,
     tamperRecord,
     simulatePayment,
@@ -91,6 +95,14 @@ export function App() {
                 items={processedActions}
                 onSelectVerdict={(item) => setSelectedVerdictItem(item)}
                 searchQuery={searchQuery}
+              />
+            )}
+
+            {currentTab === 'benchmark' && (
+              <RunReportView
+                report={benchmarkReport}
+                isEvaluating={isEvaluating}
+                onReRunBenchmark={runBenchmark}
               />
             )}
 

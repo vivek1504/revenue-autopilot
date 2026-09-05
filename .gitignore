@@ -3,7 +3,6 @@ node_modules
 db
 dist
 *.db*
-scripts/test-razorpay.ts
 audit.jsonl
 data/*.jsonl
 /generated/prisma
